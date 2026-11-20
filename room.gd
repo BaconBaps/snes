@@ -195,7 +195,6 @@ func drop_at(point: Vector2) -> void:
 		reset_lift()
 		start_cartridge()
 	elif dragging == inserted and DESK.has_point(point):
-		page = floori(inserted / float(PAGE_SIZE))
 		inserted = -1
 		reset_lift()
 		message = "Drag a cartridge into the console slot."
