@@ -39,6 +39,7 @@ var lift := 0.0:
 		queue_redraw()
 
 var crt := TextureRect.new()
+var diagnostics := Label.new()
 
 func _ready() -> void:
 	var crt_material := ShaderMaterial.new()
@@ -82,10 +83,25 @@ func _ready() -> void:
 		core_picker.add_item(name)
 	add_child(core_picker)
 
+	diagnostics.position = Vector2(163, 49)
+	diagnostics.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var panel := StyleBoxFlat.new()
+	panel.bg_color = Color("#171320ed")
+	panel.content_margin_left = 8
+	panel.content_margin_right = 8
+	panel.content_margin_top = 5
+	panel.content_margin_bottom = 5
+	diagnostics.add_theme_stylebox_override("normal", panel)
+	diagnostics.add_theme_font_size_override("font_size", 12)
+	diagnostics.hide()
+	add_child(diagnostics)
+
 func update_crt() -> void:
-	crt.texture = emulator.picture
-	crt.visible = crt.texture != null
-	crt.material.set_shader_parameter("rgb565", emulator.rgb565)
+	if crt.texture != emulator.picture:
+		crt.texture = emulator.picture
+		crt.visible = crt.texture != null
+	if crt.material.get_shader_parameter("rgb565") != emulator.rgb565:
+		crt.material.set_shader_parameter("rgb565", emulator.rgb565)
 
 func load_folder(path: String) -> void:
 	var folder := DirAccess.open(path)
@@ -128,9 +144,12 @@ func console_cartridge_height() -> float:
 	return minf(CART_SIZE.y, SEATED_CART_HEIGHT + lift)
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F11:
-		var window := get_window()
-		window.mode = Window.MODE_WINDOWED if window.mode == Window.MODE_FULLSCREEN else Window.MODE_FULLSCREEN
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_F11:
+			var window := get_window()
+			window.mode = Window.MODE_WINDOWED if window.mode == Window.MODE_FULLSCREEN else Window.MODE_FULLSCREEN
+		elif event.keycode == KEY_F10:
+			diagnostics.visible = not diagnostics.visible
 	elif event is InputEventMouseMotion:
 		pointer = get_local_mouse_position()
 	elif event is InputEventMouseButton:
@@ -201,6 +220,10 @@ func show_emulator_error(error: String) -> void:
 	queue_redraw()
 
 func _process(_delta: float) -> void:
+	if diagnostics.visible:
+		var status: String = emulator.stats if emulator.running and not emulator.stats.is_empty() else "Insert a ROM to measure playback…"
+		if diagnostics.text != status:
+			diagnostics.text = status
 	if powered and rom_paths.is_empty():
 		queue_redraw()
 

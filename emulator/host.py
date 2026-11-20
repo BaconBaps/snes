@@ -150,6 +150,10 @@ class Emulator:
         interval = 1.0 / av.fps
         deadline = time.monotonic()
         commands = bytearray()
+        sample_start = deadline
+        frame_count = 0
+        core_seconds = 0.0
+        send_seconds = 0.0
         while True:
             ready, _, _ = select.select([connection], [], [], max(0, deadline - time.monotonic()))
             if ready:
@@ -170,10 +174,26 @@ class Emulator:
             self.audio.clear()
             self.video = b""
             self.width = self.height = 0
+            frame_start = time.monotonic()
             self.core.retro_run()
+            core_end = time.monotonic()
             kind = 2 if self.pixel_format == 2 else 3
             header = struct.pack("<IIIII", kind, self.width, self.height, round(av.sample_rate), len(self.audio))
             connection.sendall(header + self.video + self.audio)
+            now = time.monotonic()
+            frame_count += 1
+            core_seconds += core_end - frame_start
+            send_seconds += now - core_end
+            elapsed = now - sample_start
+            if elapsed >= 1.0:
+                stats = struct.pack("<IIIII", 4, round(av.fps * 1000),
+                                    round(frame_count / elapsed * 1000),
+                                    round(core_seconds * 1e6 / frame_count),
+                                    round(send_seconds * 1e6 / frame_count))
+                connection.sendall(stats)
+                sample_start = now
+                frame_count = 0
+                core_seconds = send_seconds = 0.0
             deadline += interval
             if deadline < time.monotonic() - 3 * interval:
                 deadline = time.monotonic()
@@ -187,6 +207,8 @@ def main():
     try:
         with socket.create_connection(("127.0.0.1", int(port)), timeout=3) as connection:
             connection.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            # A high-resolution SNES frame can exceed the default send buffer.
+            connection.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 1024 * 1024)
             connection.sendall(nonce.encode("ascii"))
             try:
                 Emulator(Path(core), Path(save)).run(connection, Path(rom))

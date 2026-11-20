@@ -28,3 +28,7 @@ The sample cartridges show a graphical preview without Python or a core. The cor
 After ejecting, drag the cartridge back to the desk before inserting another. Scroll over the desk to view more cartridges. Saves are written to Godot's `user://saves` folder on eject or normal exit. Keep ROMs at the same paths so the prototype can match them to their saves.
 
 On Linux x86-64, put the [Linux Snes9x core](https://buildbot.libretro.com/nightly/linux/x86_64/latest/snes9x_libretro.so.zip) or the [Linux bsnes-mercury Balanced core](https://buildbot.libretro.com/nightly/linux/x86_64/latest/bsnes_mercury_balanced_libretro.so.zip) in the same folder and use `python3`. Set `BEDROOM_ARCADE_PYTHON` to a Python executable path to override the default.
+
+## Playback diagnostics
+
+Press **F10** while playing to show timing for the current session. Play for a few seconds before reading it. **Core** shows the measured emulation rate and the game's nominal rate. **Received** counts completed frame packets per second, and **CRT** counts video uploads per second. **Godot** shows the window's render rate. **Audio underruns** counts times the generator ran out of samples during the last interval. If playback stutters, capture both lines while it is happening.

@@ -9,6 +9,8 @@ const CORE_NAMES := ["Snes9x", "bsnes Balanced"]
 const CORE_FILES := ["snes9x_libretro", "bsnes_mercury_balanced_libretro"]
 const AUDIO_PREROLL_SECONDS := 0.07
 const HEADER_SIZE := 20
+const MAX_READ_PER_TICK := 2 * 1024 * 1024
+const READ_CHUNK := 256 * 1024
 const KEYS := [KEY_Z, KEY_A, KEY_SHIFT, KEY_ENTER, KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_X, KEY_S, KEY_Q, KEY_W]
 const GAMEPAD := [JOY_BUTTON_A, JOY_BUTTON_X, JOY_BUTTON_BACK, JOY_BUTTON_START,
 	JOY_BUTTON_DPAD_UP, JOY_BUTTON_DPAD_DOWN, JOY_BUTTON_DPAD_LEFT, JOY_BUTTON_DPAD_RIGHT,
@@ -28,6 +30,12 @@ var sent_mask := -1
 var audio := AudioStreamPlayer.new()
 var playback: AudioStreamGeneratorPlayback
 var audio_preroll := PackedVector2Array()
+var received_frames := 0
+var displayed_frames := 0
+var stats := ""
+var frame_stats_started := 0
+var previous_audio_skips := 0
+var core_stats := Vector4.ZERO
 
 func _ready() -> void:
 	add_child(audio)
@@ -59,6 +67,12 @@ func start(rom: String, core_index := 0) -> String:
 	running = true
 	authenticated = false
 	sent_mask = -1
+	received_frames = 0
+	displayed_frames = 0
+	previous_audio_skips = 0
+	core_stats = Vector4.ZERO
+	stats = ""
+	frame_stats_started = Time.get_ticks_msec()
 	deadline = Time.get_ticks_msec() + 8000
 	set_process(true)
 	return ""
@@ -99,11 +113,15 @@ func _process(_delta: float) -> void:
 			report_error("The emulator core did not start. Check the Python setup in README.")
 		return
 	peer.poll()
-	var available := peer.get_available_bytes()
-	if available > 0:
-		var received := peer.get_data(available)
-		if received[0] == OK:
-			incoming.append_array(received[1])
+	# A single availability snapshot can leave part of a frame behind until the next tick.
+	var budget := MAX_READ_PER_TICK
+	while budget > 0 and peer.get_available_bytes() > 0:
+		var received := peer.get_partial_data(mini(READ_CHUNK, budget))
+		var chunk: PackedByteArray = received[1]
+		if received[0] != OK or chunk.is_empty():
+			break
+		incoming.append_array(chunk)
+		budget -= chunk.size()
 	if not authenticated and incoming.size() >= nonce.size():
 		if incoming.slice(0, nonce.size()) != nonce:
 			report_error("Could not verify the local emulator connection.")
@@ -118,6 +136,7 @@ func _process(_delta: float) -> void:
 		read_frames()
 		if not running:
 			return
+		update_stats()
 		var mask := read_input()
 		if mask != sent_mask:
 			send_command(73, mask)
@@ -138,6 +157,10 @@ func read_frames() -> void:
 		var height := incoming.decode_u32(offset + 8)
 		var rate := incoming.decode_u32(offset + 12)
 		var payload_size := incoming.decode_u32(offset + 16)
+		if kind == 4:
+			core_stats = Vector4(width, height, rate, payload_size) / 1000.0
+			offset += HEADER_SIZE
+			continue
 		if kind < 1 or kind > 3 or width > 1024 or height > 1024 or payload_size > 32768:
 			report_error("Invalid data from the emulator core.")
 			return
@@ -149,6 +172,7 @@ func read_frames() -> void:
 		if kind == 1:
 			report_error(incoming.slice(start, end).get_string_from_utf8())
 			return
+		received_frames += 1
 		if width > 0 and height > 0:
 			latest_start = start
 			latest_end = video_end
@@ -166,10 +190,26 @@ func read_frames() -> void:
 			picture = ImageTexture.create_from_image(image)
 		else:
 			picture.update(image)
+		displayed_frames += 1
 		rgb565 = latest_rgb565
 		frame_changed.emit()
 	if offset > 0:
 		incoming = incoming.slice(offset)
+
+func update_stats() -> void:
+	var now := Time.get_ticks_msec()
+	var elapsed := (now - frame_stats_started) / 1000.0
+	if elapsed < 1.0:
+		return
+	var skips := playback.get_skips() if playback else 0
+	stats = "Core %.1f / %.1f fps   |   Received %.1f   |   CRT %.1f   |   Godot %d fps\n" % [
+		core_stats.y, core_stats.x, received_frames / elapsed, displayed_frames / elapsed, Engine.get_frames_per_second()]
+	stats += "Core %.2f ms   |   Socket send %.2f ms   |   Audio underruns %d" % [
+		core_stats.z, core_stats.w, skips - previous_audio_skips]
+	received_frames = 0
+	displayed_frames = 0
+	previous_audio_skips = skips
+	frame_stats_started = now
 
 func play_audio(rate: int, start: int, end: int) -> void:
 	var frame_count := (end - start) >> 2
