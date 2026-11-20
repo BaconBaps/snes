@@ -60,11 +60,6 @@ var screen_light := Color.BLACK
 var diagnostics := Label.new()
 
 func _ready() -> void:
-	var dimmer_material := ShaderMaterial.new()
-	dimmer_material.shader = preload("res://emulator/room_dimmer.gdshader")
-	dimmer_material.set_shader_parameter("screen_origin", SCREEN.position)
-	dimmer_material.set_shader_parameter("screen_size", SCREEN.size)
-	room_dimmer.material = dimmer_material
 	room_dimmer.color = Color("#0a0816ca")
 	room_dimmer.size = Vector2(1152, 607)
 	room_dimmer.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -410,7 +405,7 @@ func start_cartridge() -> void:
 		show_emulator_error(error)
 		return
 	powered = true
-	message = "Reset restarts the game. Eject returns the cartridge."
+	message = ""
 
 func show_emulator_error(error: String) -> void:
 	powered = false
@@ -529,7 +524,6 @@ func draw_desk() -> void:
 		line(Vector2(784, y), Vector2(1105, y), "#442f42", 2)
 	box(752, 539, 378, 15, "#704754")
 	line(Vector2(754, 539), Vector2(1128, 539), "#d49379", 2)
-	words("Cartridge collection", 810, 240, 25)
 	if titles.size() > page_size():
 		words("Scroll for more cartridges", 788, 572, 14)
 
