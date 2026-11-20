@@ -1099,8 +1099,8 @@ func draw_console() -> void:
 		rounded(SLOT_ART.grow(-2), 5, "#666373", "#a5a0aa")
 		for x in [SLOT_ART.position.x + 10, SLOT_ART.end.x - 10]:
 			line(Vector2(x, SLOT_ART.position.y + 3.5), Vector2(x, SLOT_ART.end.y - 3.5), "#494653")
-		draw_string(ThemeDB.fallback_font, Vector2(SLOT_ART.get_center().x - 49.5, SLOT_ART.position.y + 8.7),
-			"P A L   V E R S I O N", HORIZONTAL_ALIGNMENT_CENTER, 99, 6, Color("#e4dce2"))
+		draw_console_caption("P A L   V E R S I O N",
+			Vector2(SLOT_ART.get_center().x - 49.5, SLOT_ART.position.y + 8.4), 99, 6, "#e4dce2")
 		var arrow := Vector2(SLOT_ART.get_center().x, SLOT_ART.end.y - 4.0)
 		shape([arrow + Vector2(-3.5, 0), arrow + Vector2(3.5, 0), arrow + Vector2(0, 2)], "#a7a0ad")
 	if dragging >= 0 and SLOT.grow(20).has_point(pointer):
@@ -1179,8 +1179,13 @@ func draw_console_button(rect: Rect2, label: String, color: String) -> void:
 	line(Vector2(rect.position.x + 4, rect.end.y - 1.8),
 		Vector2(rect.end.x - 4, rect.end.y - 1.8), Color(color).darkened(0.22).to_html())
 	var center := rect.get_center()
-	draw_string(ThemeDB.fallback_font, Vector2(rect.position.x, center.y + 7), label,
-		HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 8, Color("#f9f1eb"))
+	draw_console_caption(label, Vector2(rect.position.x, center.y + 6.5), rect.size.x, 8, "#f9f1eb")
+
+func draw_console_caption(label: String, baseline: Vector2, width: float, size: int, ink: String) -> void:
+	var caption_transform := Transform2D(0.0, Vector2(1, 0.68), 0.0, baseline)
+	draw_set_transform_matrix(CONSOLE_TRANSFORM * caption_transform)
+	draw_string(ThemeDB.fallback_font, Vector2.ZERO, label, HORIZONTAL_ALIGNMENT_CENTER, width, size, Color(ink))
+	draw_set_transform_matrix(CONSOLE_TRANSFORM)
 
 func _draw() -> void:
 	draw_bedroom()
