@@ -20,7 +20,7 @@ const SEATED_CART_HEIGHT := 49.0
 const GRID_PAGE_SIZE := 6
 const STACK_PAGE_SIZE := 12
 const STACK_ROW_SPACING := 28
-const STACK_LIFT := Vector2(0, -16)
+const STACK_LIFT := Vector2(0, -22)
 const LABEL_COLORS := ["#367d80", "#a05261", "#646095", "#8b693c"]
 
 var titles := PackedStringArray(["Star Hopper", "Midnight Rally", "Moon Orchard", "Wave Rider", "Snow Circuit", "Tiny Atlas"])
@@ -33,7 +33,7 @@ var dragging := -1
 var seated := false
 var powered := false
 var page := 0
-var stacked := false
+var stacked := true
 var hovered := -1
 var pointer := Vector2.ZERO
 var message := "Drag a cartridge into the console slot."
@@ -61,40 +61,7 @@ func _ready() -> void:
 	emulator.frame_changed.connect(update_crt)
 	emulator.failed.connect(show_emulator_error)
 
-	var picker := FileDialog.new()
-	picker.access = FileDialog.ACCESS_FILESYSTEM
-	picker.file_mode = FileDialog.FILE_MODE_OPEN_DIR
-	picker.dir_selected.connect(load_folder)
-	add_child(picker)
-
-	var button := Button.new()
-	button.text = "Choose ROM folder"
-	button.position = Vector2(810, 256)
-	button.custom_minimum_size = Vector2(165, 34)
-	for state in ["normal", "hover", "pressed"]:
-		var style := StyleBoxFlat.new()
-		style.bg_color = Color("#594251") if state == "normal" else Color("#825b65")
-		style.border_color = Color("#ac7980")
-		style.set_border_width_all(1)
-		style.set_corner_radius_all(5)
-		button.add_theme_stylebox_override(state, style)
-	button.pressed.connect(func(): picker.popup_centered_ratio(0.8))
-	add_child(button)
-
-	core_picker.position = Vector2(980, 256)
-	core_picker.custom_minimum_size = Vector2(143, 34)
-	core_picker.tooltip_text = "Emulation core for the next cartridge"
-	for name in emulator.CORE_NAMES:
-		core_picker.add_item(name)
-	add_child(core_picker)
-
-	var layout_picker := OptionButton.new()
-	layout_picker.position = Vector2(1000, 560)
-	layout_picker.custom_minimum_size = Vector2(112, 31)
-	layout_picker.add_item("Grid")
-	layout_picker.add_item("Stack")
-	layout_picker.item_selected.connect(change_layout)
-	add_child(layout_picker)
+	setup_settings()
 
 	diagnostics.position = Vector2(163, 49)
 	diagnostics.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -108,6 +75,60 @@ func _ready() -> void:
 	diagnostics.add_theme_font_size_override("font_size", 12)
 	diagnostics.hide()
 	add_child(diagnostics)
+
+func setup_settings() -> void:
+	var picker := FileDialog.new()
+	picker.access = FileDialog.ACCESS_FILESYSTEM
+	picker.file_mode = FileDialog.FILE_MODE_OPEN_DIR
+	picker.dir_selected.connect(load_folder)
+	add_child(picker)
+
+	var settings := PopupPanel.new()
+	settings.name = "Settings"
+	add_child(settings)
+	var menu := VBoxContainer.new()
+	menu.add_theme_constant_override("separation", 6)
+	settings.add_child(menu)
+	menu.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 12)
+
+	var folder_button := Button.new()
+	folder_button.text = "Choose ROM folder"
+	folder_button.pressed.connect(func():
+		settings.hide()
+		picker.popup_centered_ratio(0.8))
+	menu.add_child(folder_button)
+
+	var core_label := Label.new()
+	core_label.text = "SNES core"
+	menu.add_child(core_label)
+	core_picker.tooltip_text = "Emulation core for the next cartridge"
+	for name in emulator.CORE_NAMES:
+		core_picker.add_item(name)
+	menu.add_child(core_picker)
+
+	var layout_label := Label.new()
+	layout_label.text = "Cartridge view"
+	menu.add_child(layout_label)
+	var layout_picker := OptionButton.new()
+	layout_picker.add_item("Grid")
+	layout_picker.add_item("Stack")
+	layout_picker.select(1 if stacked else 0)
+	layout_picker.item_selected.connect(change_layout)
+	menu.add_child(layout_picker)
+
+	var gear := Button.new()
+	gear.name = "SettingsButton"
+	gear.text = "⚙"
+	gear.tooltip_text = "Settings"
+	gear.position = Vector2(1084, 214)
+	gear.custom_minimum_size = Vector2(34, 32)
+	gear.flat = true
+	gear.add_theme_font_size_override("font_size", 21)
+	gear.pressed.connect(func():
+		hovered = -1
+		queue_redraw()
+		settings.popup_centered(Vector2i(264, 176)))
+	add_child(gear)
 
 func update_crt() -> void:
 	if crt.texture != emulator.picture:
@@ -165,14 +186,18 @@ func desk_position(index: int) -> Vector2:
 	var row_spacing := STACK_ROW_SPACING if stacked else 73
 	return Vector2(799 + (cell % 2) * 164, 320 + floori(cell / 2.0) * row_spacing)
 
+func displayed_desk_position(index: int) -> Vector2:
+	return desk_position(index) + (STACK_LIFT if index == hovered else Vector2.ZERO)
+
 func desk_cartridge_at(point: Vector2) -> int:
 	var visible := visible_cartridges()
-	# The frontmost cartridge owns the overlap.
+	# Hit-test from front to back, just like the stack is drawn.
 	for offset in range(visible.size() - 1, -1, -1):
 		var index: int = visible[offset]
-		if index != inserted and Rect2(desk_position(index), CART_SIZE).has_point(point):
+		if index != inserted and Rect2(displayed_desk_position(index), CART_SIZE).has_point(point):
 			return index
-	if hovered >= 0 and Rect2(desk_position(hovered) + STACK_LIFT, CART_SIZE).has_point(point):
+	# Keep the lift stable if the pointer was on the bottom edge when it moved.
+	if hovered >= 0 and Rect2(desk_position(hovered), CART_SIZE).has_point(point):
 		return hovered
 	return -1
 
@@ -504,10 +529,8 @@ func _draw() -> void:
 	draw_television()
 	draw_console()
 	for index in visible_cartridges():
-		if index != inserted and index != dragging and index != hovered:
-			cartridge(index, desk_position(index))
-	if hovered >= 0:
-		cartridge(hovered, desk_position(hovered) + STACK_LIFT)
+		if index != inserted and index != dragging:
+			cartridge(index, displayed_desk_position(index))
 	if dragging >= 0:
 		cartridge(dragging, pointer - CART_SIZE / 2.0)
 	gradient(Rect2(0, 607, 1152, 41), "#271d2cca", "#1d1726")

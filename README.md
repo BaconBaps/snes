@@ -10,7 +10,7 @@ A Godot 4 Super Nintendo emulator frontend set in a 1990s bedroom. Insert a cart
    - [Snes9x](https://buildbot.libretro.com/nightly/windows/x86_64/latest/snes9x_libretro.dll.zip)
    - [bsnes-mercury Balanced](https://buildbot.libretro.com/nightly/windows/x86_64/latest/bsnes_mercury_balanced_libretro.dll.zip)
 4. In the Godot Project Manager, choose **Import**, select `project.godot`, and press **F5**.
-5. Click **Choose ROM folder** and select a folder containing your `.sfc` or `.smc` files. Choose the core next to the folder button, then drag a cartridge to the slot. To compare cores, eject the cartridge, choose the other core, and reinsert it.
+5. Click the **Settings** gear, then **Choose ROM folder** and select a folder containing your `.sfc` or `.smc` files. Choose the core in **Settings**, then drag a cartridge to the slot. To compare cores, eject the cartridge, choose the other core, and reinsert it.
 
 The sample cartridges show a graphical preview without Python or a core. The core binaries and ROMs are separate from the repository. See the [Snes9x license](https://github.com/libretro/snes9x/blob/master/LICENSE) and [bsnes-mercury source and license](https://github.com/libretro/bsnes-mercury).
 
@@ -25,7 +25,7 @@ The sample cartridges show a graphical preview without Python or a core. The cor
 | Start / Select | Enter / Shift, or gamepad Start / Back |
 | Fullscreen | F11 |
 
-After ejecting, drag the cartridge back to the desk before inserting another. Use the **Grid / Stack** selector underneath the desk to change layouts. In Stack view, hover over an exposed cartridge to lift it and reveal its full label, then drag it as usual. Scroll over the desk to view more cartridges. Saves are written to Godot's `user://saves` folder on eject or normal exit. Keep ROMs at the same paths so the prototype can match them to their saves.
+After ejecting, drag the cartridge back to the desk before inserting another. **Stack** is the default. Use **Settings → Cartridge view** to switch to **Grid**. In Stack view, hover over an exposed cartridge to lift it and reveal its full label, then drag it as usual. Scroll over the desk to view more cartridges. Saves are written to Godot's `user://saves` folder on eject or normal exit. Keep ROMs at the same paths so the prototype can match them to their saves.
 
 On Linux x86-64, put the [Linux Snes9x core](https://buildbot.libretro.com/nightly/linux/x86_64/latest/snes9x_libretro.so.zip) or the [Linux bsnes-mercury Balanced core](https://buildbot.libretro.com/nightly/linux/x86_64/latest/bsnes_mercury_balanced_libretro.so.zip) in the same folder and use `python3`. Set `BEDROOM_ARCADE_PYTHON` to a Python executable path to override the default.
 
