@@ -17,7 +17,10 @@ const TV_GLASS := Rect2(153, 96, 480, 360)
 const SCREEN := Rect2(TV_GLASS.position + TV_OFFSET, TV_GLASS.size)
 const CART_SIZE := Vector2(122, 70)
 const SEATED_CART_HEIGHT := 49.0
-const PAGE_SIZE := 6
+const GRID_PAGE_SIZE := 6
+const STACK_PAGE_SIZE := 12
+const STACK_ROW_SPACING := 28
+const STACK_LIFT := Vector2(0, -16)
 const LABEL_COLORS := ["#367d80", "#a05261", "#646095", "#8b693c"]
 
 var titles := PackedStringArray(["Star Hopper", "Midnight Rally", "Moon Orchard", "Wave Rider", "Snow Circuit", "Tiny Atlas"])
@@ -30,6 +33,8 @@ var dragging := -1
 var seated := false
 var powered := false
 var page := 0
+var stacked := false
+var hovered := -1
 var pointer := Vector2.ZERO
 var message := "Drag a cartridge into the console slot."
 var eject_animation: Tween
@@ -83,6 +88,14 @@ func _ready() -> void:
 		core_picker.add_item(name)
 	add_child(core_picker)
 
+	var layout_picker := OptionButton.new()
+	layout_picker.position = Vector2(1000, 560)
+	layout_picker.custom_minimum_size = Vector2(112, 31)
+	layout_picker.add_item("Grid")
+	layout_picker.add_item("Stack")
+	layout_picker.item_selected.connect(change_layout)
+	add_child(layout_picker)
+
 	diagnostics.position = Vector2(163, 49)
 	diagnostics.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var panel := StyleBoxFlat.new()
@@ -123,6 +136,7 @@ func load_folder(path: String) -> void:
 	seated = false
 	powered = false
 	page = 0
+	hovered = -1
 	reset_lift()
 	message = "No .sfc or .smc files in this folder." if titles.is_empty() else "Drag a cartridge into the console slot."
 	queue_redraw()
@@ -132,9 +146,35 @@ func reset_lift() -> void:
 		eject_animation.kill()
 	lift = 0.0
 
+func page_size() -> int:
+	return STACK_PAGE_SIZE if stacked else GRID_PAGE_SIZE
+
+func visible_cartridges() -> Array:
+	var size := page_size()
+	return range(page * size, mini(titles.size(), (page + 1) * size))
+
+func change_layout(index: int) -> void:
+	var first_visible := page * page_size()
+	stacked = index == 1
+	page = floori(first_visible / float(page_size()))
+	hovered = -1
+	queue_redraw()
+
 func desk_position(index: int) -> Vector2:
-	var cell := index % PAGE_SIZE
-	return Vector2(799 + (cell % 2) * 164, 320 + floori(cell / 2.0) * 73)
+	var cell := index % page_size()
+	var row_spacing := STACK_ROW_SPACING if stacked else 73
+	return Vector2(799 + (cell % 2) * 164, 320 + floori(cell / 2.0) * row_spacing)
+
+func desk_cartridge_at(point: Vector2) -> int:
+	var visible := visible_cartridges()
+	# The frontmost cartridge owns the overlap.
+	for offset in range(visible.size() - 1, -1, -1):
+		var index: int = visible[offset]
+		if index != inserted and Rect2(desk_position(index), CART_SIZE).has_point(point):
+			return index
+	if hovered >= 0 and Rect2(desk_position(hovered) + STACK_LIFT, CART_SIZE).has_point(point):
+		return hovered
+	return -1
 
 func console_position() -> Vector2:
 	var slot_lip := CONSOLE_TRANSFORM * Vector2(SLOT_ART.get_center().x, 536)
@@ -152,6 +192,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			diagnostics.visible = not diagnostics.visible
 	elif event is InputEventMouseMotion:
 		pointer = get_local_mouse_position()
+		hovered = desk_cartridge_at(pointer) if stacked and dragging < 0 else -1
 	elif event is InputEventMouseButton:
 		pointer = get_local_mouse_position()
 		if event.button_index == MOUSE_BUTTON_LEFT:
@@ -161,7 +202,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				drop_at(pointer)
 		elif event.pressed and DESK.has_point(pointer) and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
 			var direction := 1 if event.button_index == MOUSE_BUTTON_WHEEL_DOWN else -1
-			page = clampi(page + direction, 0, maxi(0, ceili(titles.size() / float(PAGE_SIZE)) - 1))
+			page = clampi(page + direction, 0, maxi(0, ceili(titles.size() / float(page_size())) - 1))
+			hovered = -1
 	queue_redraw()
 
 func press_at(point: Vector2) -> void:
@@ -183,10 +225,9 @@ func press_at(point: Vector2) -> void:
 	elif inserted >= 0 and not seated and Rect2(console_position(), Vector2(CART_SIZE.x, console_cartridge_height())).has_point(point):
 		dragging = inserted
 	elif inserted < 0:
-		for index in range(page * PAGE_SIZE, mini(titles.size(), (page + 1) * PAGE_SIZE)):
-			if Rect2(desk_position(index), CART_SIZE).has_point(point):
-				dragging = index
-				break
+		dragging = desk_cartridge_at(point)
+		if dragging >= 0:
+			hovered = -1
 
 func drop_at(point: Vector2) -> void:
 	if SLOT.grow(20).has_point(point):
@@ -347,7 +388,7 @@ func draw_desk() -> void:
 	box(752, 539, 378, 15, "#704754")
 	line(Vector2(754, 539), Vector2(1128, 539), "#d49379", 2)
 	words("Cartridge collection", 810, 240, 25)
-	if titles.size() > PAGE_SIZE:
+	if titles.size() > page_size():
 		words("Scroll for more cartridges", 788, 572, 14)
 
 func draw_television() -> void:
@@ -462,9 +503,11 @@ func _draw() -> void:
 	draw_desk()
 	draw_television()
 	draw_console()
-	for index in range(page * PAGE_SIZE, mini(titles.size(), (page + 1) * PAGE_SIZE)):
-		if index != inserted and index != dragging:
+	for index in visible_cartridges():
+		if index != inserted and index != dragging and index != hovered:
 			cartridge(index, desk_position(index))
+	if hovered >= 0:
+		cartridge(hovered, desk_position(hovered) + STACK_LIFT)
 	if dragging >= 0:
 		cartridge(dragging, pointer - CART_SIZE / 2.0)
 	gradient(Rect2(0, 607, 1152, 41), "#271d2cca", "#1d1726")

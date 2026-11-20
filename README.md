@@ -25,7 +25,7 @@ The sample cartridges show a graphical preview without Python or a core. The cor
 | Start / Select | Enter / Shift, or gamepad Start / Back |
 | Fullscreen | F11 |
 
-After ejecting, drag the cartridge back to the desk before inserting another. Scroll over the desk to view more cartridges. Saves are written to Godot's `user://saves` folder on eject or normal exit. Keep ROMs at the same paths so the prototype can match them to their saves.
+After ejecting, drag the cartridge back to the desk before inserting another. Use the **Grid / Stack** selector underneath the desk to change layouts. In Stack view, hover over an exposed cartridge to lift it and reveal its full label, then drag it as usual. Scroll over the desk to view more cartridges. Saves are written to Godot's `user://saves` folder on eject or normal exit. Keep ROMs at the same paths so the prototype can match them to their saves.
 
 On Linux x86-64, put the [Linux Snes9x core](https://buildbot.libretro.com/nightly/linux/x86_64/latest/snes9x_libretro.so.zip) or the [Linux bsnes-mercury Balanced core](https://buildbot.libretro.com/nightly/linux/x86_64/latest/bsnes_mercury_balanced_libretro.so.zip) in the same folder and use `python3`. Set `BEDROOM_ARCADE_PYTHON` to a Python executable path to override the default.
 
