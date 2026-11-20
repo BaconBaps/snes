@@ -53,7 +53,7 @@ const POINTER_DEVICE := -100
 const STICK_DEADZONE := 0.20
 const TRIGGER_PRESS := 0.60
 const TRIGGER_RELEASE := 0.35
-const STACK_LIFT := Vector2(0, -22)
+const STACK_LIFT := -22.0
 const LABEL_COLORS := ["#367d80", "#a05261", "#646095", "#8b693c"]
 
 var titles := PackedStringArray(["Star Hopper", "Midnight Rally", "Moon Orchard", "Wave Rider", "Snow Circuit", "Tiny Atlas"])
@@ -76,7 +76,18 @@ var seated := false
 var powered := false
 var page := 0
 var stacked := true
-var hovered := -1
+var stack_offsets: Dictionary[int, float] = {}
+var stack_tweens: Dictionary[int, Tween] = {}
+var hovered := -1:
+	set(index):
+		if hovered == index:
+			return
+		var previous := hovered
+		hovered = index
+		if previous >= 0:
+			ease_stack_card(previous, 0.0)
+		if index >= 0:
+			ease_stack_card(index, STACK_LIFT)
 var pointer := Vector2.ZERO
 var virtual_position := Vector2.ZERO
 var virtual_pointer_active := false
@@ -142,6 +153,7 @@ func _ready() -> void:
 
 	setup_settings()
 	setup_cartridge_navigation()
+	get_window().mouse_exited.connect(func(): hovered = -1)
 	# Godot's built-in UI actions otherwise also react to SNES gameplay buttons.
 	for action in InputMap.get_actions():
 		if String(action).begins_with("ui_"):
@@ -436,7 +448,7 @@ func load_folder(path: String) -> void:
 	page = 0
 	refresh_alphabet()
 	update_page_controls()
-	hovered = -1
+	clear_stack_hover()
 	reset_lift()
 	message = "No .sfc or .smc files in this folder." if titles.is_empty() else "Drag a cartridge into the console slot."
 	queue_redraw()
@@ -520,7 +532,7 @@ func change_layout(index: int) -> void:
 	save_preferences()
 	page = floori(first_visible / float(page_size()))
 	update_page_controls()
-	hovered = -1
+	clear_stack_hover()
 	queue_redraw()
 
 func desk_position(index: int) -> Vector2:
@@ -529,7 +541,32 @@ func desk_position(index: int) -> Vector2:
 	return Vector2(799 + (cell % 2) * 164, (320 if stacked else 309) + floori(cell / 2.0) * row_spacing)
 
 func displayed_desk_position(index: int) -> Vector2:
-	return desk_position(index) + (STACK_LIFT if index == hovered else Vector2.ZERO)
+	return desk_position(index) + Vector2(0, stack_offsets.get(index, 0.0))
+
+func ease_stack_card(index: int, target: float) -> void:
+	if stack_tweens.has(index):
+		stack_tweens[index].kill()
+	var start: float = stack_offsets.get(index, 0.0)
+	if is_equal_approx(start, target):
+		stack_tweens.erase(index)
+		return
+	var tween := create_tween()
+	stack_tweens[index] = tween
+	tween.tween_method(func(offset: float):
+		stack_offsets[index] = offset
+		queue_redraw(), start, target, 0.17 if target < 0.0 else 0.21
+	).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tween.finished.connect(func():
+		stack_tweens.erase(index)
+		if is_zero_approx(target):
+			stack_offsets.erase(index))
+
+func clear_stack_hover() -> void:
+	hovered = -1
+	for tween in stack_tweens.values():
+		tween.kill()
+	stack_tweens.clear()
+	stack_offsets.clear()
 
 func desk_cartridge_at(point: Vector2) -> int:
 	var visible := visible_cartridges()
@@ -580,14 +617,17 @@ func page_count() -> int:
 	return maxi(1, ceili(titles.size() / float(page_size())))
 
 func turn_page(direction: int) -> void:
-	page = clampi(page + direction, 0, page_count() - 1)
-	hovered = -1
+	var next_page := clampi(page + direction, 0, page_count() - 1)
+	if next_page == page:
+		return
+	page = next_page
+	clear_stack_hover()
 	update_page_controls()
 	queue_redraw()
 
 func jump_to_title(index: int) -> void:
 	page = floori(index / float(page_size()))
-	hovered = -1
+	clear_stack_hover()
 	update_page_controls()
 	queue_redraw()
 
