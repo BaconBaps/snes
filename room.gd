@@ -752,7 +752,7 @@ func press_at(point: Vector2) -> void:
 		seated = false
 		eject_animation = create_tween()
 		eject_animation.tween_property(self, "lift", CART_SIZE.y - SEATED_CART_HEIGHT + 2.0, 0.17).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-		message = "Drag the ejected cartridge back to the desk."
+		message = "Drag the ejected cartridge back to the shoebox."
 	elif inserted >= 0 and not seated and Rect2(console_position(), Vector2(CART_SIZE.x, console_cartridge_height())).has_point(point):
 		dragging = inserted
 	elif inserted < 0:
@@ -948,23 +948,47 @@ func draw_ceiling_light() -> void:
 	if CEILING_LIGHT.has_point(pointer):
 		line(Vector2(992, 108), Vector2(1075, 108), "#fff0d8" if ceiling_light_on else "#9d7b8b", 2)
 
-func draw_desk() -> void:
+func draw_shoebox() -> void:
+	# The lid rests against the back of the box.
+	glow(Vector2(945, 585), Vector2(200, 27), Color("#140b16a0"))
+	shape([Vector2(785, 311), Vector2(810, 244), Vector2(1091, 250),
+		Vector2(1114, 316)], "#45313b")
+	shape([Vector2(796, 306), Vector2(818, 251), Vector2(1084, 257),
+		Vector2(1102, 310)], "#896459")
+	line(Vector2(819, 252), Vector2(1083, 258), "#c3967c", 2)
+	line(Vector2(809, 276), Vector2(1091, 282), "#a57969", 2)
+	rounded(Rect2(915, 262, 70, 14), 2, "#cfab8c35")
 
-	rounded(Rect2(777, 482, 336, 100), 5, "#30212e")
-	gradient(Rect2(783, 514, 319, 64), "#8c5957", "#523545")
-	box(789, 562, 22, 41, "#593a46")
-	box(1079, 559, 20, 44, "#563741")
-	shape([Vector2(810, 292), Vector2(1099, 292), Vector2(1130, 556), Vector2(752, 556)], "#84596a")
-	shape([Vector2(819, 301), Vector2(1091, 301), Vector2(1115, 552), Vector2(769, 552)], "#593e52")
-	gradient(Rect2(785, 322, 311, 230), "#765160", "#4e3648")
-	for index in range(27):
-		var y := 326 + index * 7
-		line(Vector2(788 + (index * 17) % 130, y),
-			Vector2(1093 - (index * 11) % 120, y + 1), "#d3a4b413")
-	for y in [306, 387, 468, 555]:
-		line(Vector2(784, y), Vector2(1105, y), "#442f42", 2)
-	box(752, 556, 378, 15, "#704754")
-	line(Vector2(754, 556), Vector2(1128, 556), "#d49379", 2)
+	# The back and side walls frame the darker cardboard interior.
+	shape([Vector2(797, 293), Vector2(1094, 293), Vector2(1131, 556),
+		Vector2(751, 556)], "#a27c6e")
+	shape([Vector2(801, 299), Vector2(1090, 299), Vector2(1092, 324),
+		Vector2(797, 324)], "#63454a")
+	shape([Vector2(797, 319), Vector2(1092, 319), Vector2(1119, 553),
+		Vector2(764, 553)], "#5c4148")
+	shape([Vector2(796, 301), Vector2(799, 319), Vector2(774, 548),
+		Vector2(759, 553)], "#79574f")
+	shape([Vector2(1097, 302), Vector2(1123, 553), Vector2(1109, 548),
+		Vector2(1092, 319)], "#3d2b37")
+	line(Vector2(800, 293), Vector2(1092, 293), "#ca9a7d", 2)
+	line(Vector2(797, 294), Vector2(752, 555), "#c3947c", 2)
+	line(Vector2(1095, 294), Vector2(1130, 555), "#b38671", 2)
+	for index in range(12):
+		var y := 330 + index * 18
+		line(Vector2(778 + (index * 13) % 79, y),
+			Vector2(1100 - (index * 17) % 75, y + 1), "#c0987e17")
+
+func draw_shoebox_front() -> void:
+	# Draw the front lip after the contents so it occludes their shadows.
+	shape([Vector2(753, 553), Vector2(1130, 553), Vector2(1122, 596),
+		Vector2(761, 596)], "#7f5955")
+	gradient(Rect2(762, 560, 359, 35), "#8e665c", "#5c3d47")
+	line(Vector2(754, 554), Vector2(1128, 554), "#cea084", 3)
+	line(Vector2(760, 562), Vector2(1125, 562), "#b28472")
+	line(Vector2(762, 595), Vector2(1121, 595), "#3a2935", 2)
+	for x in [770, 1112]:
+		line(Vector2(x, 562), Vector2(x, 592), "#68474b")
+	rounded(Rect2(919, 564, 48, 7), 4, "#50343e", "#a77565")
 
 func draw_tv_stand() -> void:
 	# The console sits in front of the stand, with the TV's feet on its top.
@@ -1112,7 +1136,7 @@ func draw_console_button(rect: Rect2, label: String, color: String) -> void:
 func _draw() -> void:
 	draw_bedroom()
 	draw_ceiling_light()
-	draw_desk()
+	draw_shoebox()
 	draw_tv_stand()
 	draw_television()
 	draw_console()
@@ -1120,6 +1144,7 @@ func _draw() -> void:
 	for index in visible_cartridges():
 		if index != inserted and index != dragging:
 			cartridge(index, displayed_desk_position(index))
+	draw_shoebox_front()
 	if dragging >= 0:
 		cartridge(dragging, pointer - CART_SIZE / 2.0)
 	gradient(Rect2(0, 607, 1152, 41), "#271d2cca", "#1d1726")
