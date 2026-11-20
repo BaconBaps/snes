@@ -95,8 +95,6 @@ var lift := 0.0:
 		queue_redraw()
 
 var crt := TextureRect.new()
-var view_3d: SubViewport
-var use_3d := false
 var room_dimmer := ColorRect.new()
 var ceiling_light_on := true
 var scanlines_enabled := false
@@ -408,20 +406,9 @@ func add_emulation_controls(page_controls: VBoxContainer) -> void:
 func update_crt() -> void:
 	if crt.texture != emulator.picture:
 		crt.texture = emulator.picture
-	crt.visible = crt.texture != null and not use_3d
+		crt.visible = crt.texture != null
 	if crt.material.get_shader_parameter("rgb565") != emulator.rgb565:
 		crt.material.set_shader_parameter("rgb565", emulator.rgb565)
-
-func toggle_room_view() -> void:
-	if not view_3d:
-		view_3d = preload("res://prototype_3d/room_view.gd").new()
-		add_child(view_3d)
-		view_3d.build(SCREEN, SLOT, RESET, EJECT)
-	use_3d = not use_3d
-	view_3d.set_active(use_3d)
-	crt.visible = crt.texture != null and not use_3d
-	room_dimmer.visible = not ceiling_light_on and not use_3d
-	queue_redraw()
 
 func load_folder(path: String) -> void:
 	var folder := DirAccess.open(path)
@@ -645,8 +632,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.keycode == KEY_F11:
 			var window := get_window()
 			window.mode = Window.MODE_WINDOWED if window.mode == Window.MODE_FULLSCREEN else Window.MODE_FULLSCREEN
-		elif event.keycode == KEY_F9:
-			toggle_room_view()
 		elif event.keycode == KEY_F10:
 			diagnostics.visible = not diagnostics.visible
 	elif event is InputEventMouseMotion:
@@ -742,7 +727,7 @@ func press_at(point: Vector2) -> void:
 	var plug := player_two_plug_position()
 	if CEILING_LIGHT.has_point(point) and dragging < 0:
 		ceiling_light_on = not ceiling_light_on
-		room_dimmer.visible = not ceiling_light_on and not use_3d
+		room_dimmer.visible = not ceiling_light_on
 		save_preferences()
 		queue_redraw()
 		return
@@ -837,15 +822,6 @@ func _process(delta: float) -> void:
 	screen_spill.visible = screen_light.get_luminance() > 0.005
 	if screen_spill.visible:
 		screen_spill.material.set_shader_parameter("light_color", Vector3(screen_light.r, screen_light.g, screen_light.b))
-	if use_3d:
-		view_3d.update_screen(emulator.picture, emulator.rgb565, scanlines_enabled, shader_preset, powered and rom_paths.is_empty())
-		view_3d.update_lighting(ceiling_light_on, screen_light, powered)
-		var cartridge_visible := inserted >= 0 and inserted != dragging
-		if cartridge_visible:
-			view_3d.update_cartridge(true, console_position(), CART_SIZE.x, console_cartridge_height(),
-				titles[inserted], cartridge_label_texture(inserted), LABEL_SIZE)
-		else:
-			view_3d.cartridge_model.hide()
 	if diagnostics.visible:
 		var status: String = emulator.stats if emulator.running and not emulator.stats.is_empty() else "Insert a ROM to measure playback…"
 		if diagnostics.text != status:
@@ -1137,14 +1113,9 @@ func _draw() -> void:
 	draw_bedroom()
 	draw_ceiling_light()
 	draw_desk()
-	if use_3d:
-		if not ceiling_light_on:
-			draw_rect(Rect2(0, 0, 1152, 607), room_dimmer.color)
-		draw_texture_rect(view_3d.get_texture(), Rect2(0, 0, 1152, 607), false)
-	else:
-		draw_tv_stand()
-		draw_television()
-		draw_console()
+	draw_tv_stand()
+	draw_television()
+	draw_console()
 	draw_controller_plugs()
 	for index in visible_cartridges():
 		if index != inserted and index != dragging:
@@ -1153,4 +1124,4 @@ func _draw() -> void:
 		cartridge(dragging, pointer - CART_SIZE / 2.0)
 	gradient(Rect2(0, 607, 1152, 41), "#271d2cca", "#1d1726")
 	words(message, 32, 633, 16, 920)
-	words("F9  %s room   ·   F11  Fullscreen" % ("2D" if use_3d else "3D"), 902, 633, 14)
+	words("F11  Fullscreen", 994, 633, 15)

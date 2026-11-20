@@ -22,10 +22,6 @@ Put a cropped label image next to its ROM or choose a separate directory under *
 
 Artwork stretches to fill the rounded label area. Crop it to roughly 3.3:1 beforehand if you want to preserve its original proportions.
 
-## Experimental fixed-camera 3D view
-
-Press **F9** to switch between the original room and the 3D prototype, even while a game is running. The prototype renders the CRT, stand, console, and seated or ejected cartridge in 3D, with a ceiling light and game-coloured spill. The painted room backdrop and cartridge browser remain 2D. Use **F10** to compare playback timing in both views.
-
 ## Room and emulation settings
 
 Click the hanging light to dim the bedroom. The CRT image and its glow keep their brightness.
