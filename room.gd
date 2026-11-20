@@ -26,9 +26,21 @@ var lift := 0.0:
 		lift = value
 		queue_redraw()
 
+var crt := TextureRect.new()
+
 func _ready() -> void:
+	var crt_material := ShaderMaterial.new()
+	crt_material.shader = preload("res://emulator/crt.gdshader")
+	crt.material = crt_material
+	crt.position = SCREEN.position
+	crt.size = SCREEN.size
+	crt.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	crt.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	crt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	crt.hide()
+	add_child(crt)
 	add_child(emulator)
-	emulator.frame_changed.connect(queue_redraw)
+	emulator.frame_changed.connect(update_crt)
 	emulator.failed.connect(show_emulator_error)
 
 	var picker := FileDialog.new()
@@ -42,6 +54,11 @@ func _ready() -> void:
 	button.position = Vector2(771, 244)
 	button.pressed.connect(func(): picker.popup_centered_ratio(0.8))
 	add_child(button)
+
+func update_crt() -> void:
+	crt.texture = emulator.picture
+	crt.visible = crt.texture != null
+	crt.material.set_shader_parameter("rgb565", emulator.rgb565)
 
 func load_folder(path: String) -> void:
 	var folder := DirAccess.open(path)
@@ -205,9 +222,7 @@ func _draw() -> void:
 	box(223, 158, 404, 277, "#494958")
 	box(231, 169, 349, 266, "#252635")
 	draw_rect(SCREEN, Color("#151c28"))
-	if emulator.picture:
-		draw_texture_rect(emulator.picture, SCREEN, false)
-	elif powered and rom_paths.is_empty():
+	if powered and rom_paths.is_empty():
 		draw_rect(SCREEN, Color("#253951"))
 		draw_circle(Vector2(484, 258 + sin((Time.get_ticks_msec() - preview_started) / 360.0) * 8), 42, Color("#f4aa79"))
 		box(241, 327, 328, 98, "#2a5861")

@@ -29,22 +29,12 @@ class AVInfo(c.Structure):
                 ("fps", c.c_double), ("sample_rate", c.c_double)]
 
 
-def rgb_table(red_shift, green_shift, green_max):
-    return [
-        bytes(((pixel >> red_shift & 31) * 255 // 31,
-               (pixel >> green_shift & green_max) * 255 // green_max,
-               (pixel & 31) * 255 // 31))
-        for pixel in range(65536)
-    ]
-
-
 class Emulator:
     def __init__(self, core_path, save_path):
         self.core = c.CDLL(str(core_path))
         self.save_path = save_path
         self.system_dir = os.fsencode(save_path.parent)
         self.pixel_format = 0
-        self.tables = [rgb_table(10, 5, 31), rgb_table(11, 5, 63)]
         self.buttons = 0
         self.audio = bytearray()
         self.video = b""
@@ -100,13 +90,11 @@ class Emulator:
             self.width = self.height = 0
             return
         raw = c.string_at(data, pitch * height)
-        table = self.tables[self.pixel_format == 2]
-        pixels = memoryview(raw).cast("H")
-        stride = pitch // 2
-        self.video = b"".join(
-            table[pixel] for row in range(height)
-            for pixel in pixels[row * stride:row * stride + width]
-        )
+        row_size = width * 2
+        if pitch == row_size:
+            self.video = raw
+        else:
+            self.video = b"".join(raw[row:row + row_size] for row in range(0, len(raw), pitch))
         self.width, self.height = width, height
 
     def sample(self, left, right):
@@ -183,23 +171,33 @@ class Emulator:
             self.video = b""
             self.width = self.height = 0
             self.core.retro_run()
-            header = struct.pack("<IIIII", 0, self.width, self.height, round(av.sample_rate), len(self.audio))
+            kind = 2 if self.pixel_format == 2 else 3
+            header = struct.pack("<IIIII", kind, self.width, self.height, round(av.sample_rate), len(self.audio))
             connection.sendall(header + self.video + self.audio)
-            deadline = max(deadline + interval, time.monotonic())
+            deadline += interval
+            if deadline < time.monotonic() - 3 * interval:
+                deadline = time.monotonic()
 
 
 def main():
     port, nonce, core, rom, save = sys.argv[1:]
-    with socket.create_connection(("127.0.0.1", int(port)), timeout=3) as connection:
-        connection.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        connection.sendall(nonce.encode("ascii"))
-        try:
-            Emulator(Path(core), Path(save)).run(connection, Path(rom))
-        except (BrokenPipeError, ConnectionResetError):
-            pass
-        except Exception as error:
-            message = str(error).encode("utf-8")[:4096]
-            connection.sendall(struct.pack("<IIIII", 1, 0, 0, 0, len(message)) + message)
+    # Windows socket waits can otherwise round up to the system timer tick.
+    timer = c.WinDLL("winmm") if sys.platform == "win32" else None
+    timer_active = timer is not None and timer.timeBeginPeriod(1) == 0
+    try:
+        with socket.create_connection(("127.0.0.1", int(port)), timeout=3) as connection:
+            connection.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            connection.sendall(nonce.encode("ascii"))
+            try:
+                Emulator(Path(core), Path(save)).run(connection, Path(rom))
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+            except Exception as error:
+                message = str(error).encode("utf-8")[:4096]
+                connection.sendall(struct.pack("<IIIII", 1, 0, 0, 0, len(message)) + message)
+    finally:
+        if timer_active:
+            timer.timeEndPeriod(1)
 
 
 if __name__ == "__main__":

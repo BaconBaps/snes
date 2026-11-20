@@ -3,6 +3,8 @@ extends Node
 signal failed(message: String)
 signal frame_changed
 
+var rgb565 := true
+
 const HEADER_SIZE := 20
 const KEYS := [KEY_Z, KEY_A, KEY_SHIFT, KEY_ENTER, KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_X, KEY_S, KEY_Q, KEY_W]
 const GAMEPAD := [JOY_BUTTON_A, JOY_BUTTON_X, JOY_BUTTON_BACK, JOY_BUTTON_START,
@@ -65,6 +67,7 @@ func stop() -> void:
 	server.stop()
 	incoming.clear()
 	picture = null
+	frame_changed.emit()
 	audio.stop()
 	playback = null
 	running = false
@@ -118,17 +121,22 @@ func _process(_delta: float) -> void:
 
 func read_frames() -> void:
 	var offset := 0
+	var latest_start := -1
+	var latest_end := 0
+	var latest_width := 0
+	var latest_height := 0
+	var latest_rgb565 := true
 	while incoming.size() - offset >= HEADER_SIZE:
 		var kind := incoming.decode_u32(offset)
 		var width := incoming.decode_u32(offset + 4)
 		var height := incoming.decode_u32(offset + 8)
 		var rate := incoming.decode_u32(offset + 12)
 		var payload_size := incoming.decode_u32(offset + 16)
-		if kind > 1 or width > 1024 or height > 1024 or payload_size > 32768:
+		if kind < 1 or kind > 3 or width > 1024 or height > 1024 or payload_size > 32768:
 			report_error("Invalid data from Snes9x.")
 			return
 		var start := offset + HEADER_SIZE
-		var video_end := start + width * height * 3
+		var video_end := start + width * height * 2
 		var end := video_end + payload_size
 		if incoming.size() < end:
 			break
@@ -136,15 +144,24 @@ func read_frames() -> void:
 			report_error(incoming.slice(start, end).get_string_from_utf8())
 			return
 		if width > 0 and height > 0:
-			var image := Image.create_from_data(width, height, false, Image.FORMAT_RGB8, incoming.slice(start, video_end))
-			if not picture or picture.get_width() != width or picture.get_height() != height:
-				picture = ImageTexture.create_from_image(image)
-			else:
-				picture.update(image)
-			frame_changed.emit()
+			latest_start = start
+			latest_end = video_end
+			latest_width = width
+			latest_height = height
+			latest_rgb565 = kind == 2
 		if rate > 0 and payload_size > 0:
 			play_audio(rate, video_end, end)
 		offset = end
+	# Keep all audio, but upload only the newest complete video frame.
+	if latest_start >= 0:
+		var image := Image.create_from_data(latest_width, latest_height, false, Image.FORMAT_RG8,
+			incoming.slice(latest_start, latest_end))
+		if not picture or picture.get_width() != latest_width or picture.get_height() != latest_height:
+			picture = ImageTexture.create_from_image(image)
+		else:
+			picture.update(image)
+		rgb565 = latest_rgb565
+		frame_changed.emit()
 	if offset > 0:
 		incoming = incoming.slice(offset)
 
