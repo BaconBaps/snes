@@ -1088,34 +1088,18 @@ func draw_console() -> void:
 	# The wide front and foreshortened top follow the angled PAL reference.
 	glow(Vector2(414, 587), Vector2(171, 27), Color("#201927b0"))
 	draw_set_transform_matrix(CONSOLE_TRANSFORM)
-	rounded(Rect2(277, 574, 277, 33), 14, "#958579", "#b4a297")
-	rounded(Rect2(282, 579, 267, 21), 9, "#aea195")
-	shape([Vector2(277, 581), Vector2(281, 571), Vector2(308, 508), Vector2(316, 501),
-		Vector2(514, 501), Vector2(523, 508), Vector2(552, 572), Vector2(554, 581),
-		Vector2(545, 588), Vector2(287, 588)], "#a196a7")
-	shape([Vector2(288, 579), Vector2(313, 508), Vector2(518, 508), Vector2(543, 579),
-		Vector2(536, 584), Vector2(294, 584)], "#c1b6bc")
-	line(Vector2(294, 586), Vector2(538, 586), "#f7e4cf", 2)
-	line(Vector2(281, 592), Vector2(550, 592), "#7c7069")
-	shape([Vector2(320, 511), Vector2(510, 511), Vector2(530, 568), Vector2(524, 574),
-		Vector2(305, 574), Vector2(301, 569)], "#918b94")
-	shape([Vector2(323, 511), Vector2(508, 511), Vector2(525, 567), Vector2(520, 571),
-		Vector2(310, 571), Vector2(306, 567)], "#aaa5af")
-	for x in range(330, 507, 7):
-		line(Vector2(x, 502), Vector2(x, 507), "#887d78", 2)
-
-	draw_circle(Vector2(503, 519), 5.5, Color("#817d89"), true, -1, true)
-	draw_circle(Vector2(502, 517), 1.55, Color("#72a9d3"), true, -1, true)
-	draw_circle(Vector2(506, 519), 1.55, Color("#df7773"), true, -1, true)
-	draw_circle(Vector2(500, 520), 1.55, Color("#83c49d"), true, -1, true)
-	draw_circle(Vector2(503, 522), 1.55, Color("#edc479"), true, -1, true)
+	draw_texture_rect(preload("res://art/pal-console-shell.png"), Rect2(272, 494, 289, 114), false)
 
 	# The top hatch sits behind the three controls, with its lip in front of the cartridge.
 	rounded(SLOT_ART.grow(4), 8, "#928c96")
 	rounded(SLOT_ART, 6, "#a8a3ac" if seated else "#292634")
 	if inserted < 0 or dragging == inserted:
-		rounded(SLOT_ART.grow(-2), 5, "#696473", "#a5a0aa")
-		words("P A L   V E R S I O N", 379, 535, 7)
+		rounded(SLOT_ART.grow(-2), 5, "#666373", "#a5a0aa")
+		line(Vector2(357, 528.5), Vector2(357, 535.5), "#494653")
+		line(Vector2(474, 528.5), Vector2(474, 535.5), "#494653")
+		draw_string(ThemeDB.fallback_font, Vector2(366, 533.7), "P A L   V E R S I O N",
+			HORIZONTAL_ALIGNMENT_CENTER, 99, 6, Color("#e4dce2"))
+		shape([Vector2(412, 535), Vector2(419, 535), Vector2(415.5, 537)], "#a7a0ad")
 	if dragging >= 0 and SLOT.grow(20).has_point(pointer):
 		rounded(SLOT_ART.grow(3), 7, "#eab58975", "#ffdfad")
 	if inserted >= 0 and inserted != dragging:
@@ -1123,6 +1107,7 @@ func draw_console() -> void:
 		# At rest the slot hides the shell immediately below the label.
 		cartridge(inserted, console_position(), console_cartridge_height())
 		draw_set_transform_matrix(CONSOLE_TRANSFORM)
+	draw_texture_rect(preload("res://art/pal-console-slot-lip.png"), Rect2(340, 536, 151, 7), false)
 
 	draw_console_button(Rect2(321, 548, 39, BUTTON_HEIGHT), "POWER", "#575465")
 	var switch_y := 553 if powered else 558
@@ -1130,18 +1115,14 @@ func draw_console() -> void:
 	draw_console_button(EJECT_ART, "EJECT", "#bcb9bf" if EJECT.has_point(pointer) else "#a6a1aa")
 	draw_console_button(RESET_ART, "RESET", "#817d90" if RESET.has_point(pointer) else "#626070")
 
-	draw_string(ThemeDB.fallback_font, Vector2(315, 583), "SUPER NINTENDO",
+	draw_string(ThemeDB.fallback_font, Vector2(321, 578), "SUPER NINTENDO",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color("#494654"))
-	rounded(Rect2(490, 577, 18, 5), 3, "#786567", "#c4b2ae")
+	draw_string(ThemeDB.fallback_font, Vector2(321, 582.5), "ENTERTAINMENT SYSTEM",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 5, Color("#68616c"))
 	if powered:
-		glow(Vector2(499, 579), Vector2(24, 12), Color("#ff4d557f"))
-		rounded(Rect2(491, 577, 16, 5), 2, "#ff3d5c")
-
-	rounded(Rect2(335, 589, 157, 13), 7, "#b6a597", "#867a73")
-	for x in [355, 440]:
-		rounded(Rect2(x, 591, 35, 8), 3, "#34313c")
-		for pin in range(7):
-			draw_circle(Vector2(x + 4 + pin * 4.5, 595), 1.0, Color("#aa9892"))
+		glow(Vector2(499, 579), Vector2(20, 8), Color("#ff4d5568"))
+		rounded(Rect2(492, 577.8, 14, 3), 2, "#ff3d5c")
+		line(Vector2(495, 578.3), Vector2(503, 578.3), "#ffacaf")
 	draw_set_transform(Vector2.ZERO)
 
 func draw_controller_plugs() -> void:
@@ -1167,8 +1148,14 @@ func draw_controller_plug(at: Vector2, cable_end: Vector2) -> void:
 	rounded(Rect2(start - Vector2(4, 3), Vector2(8, 7)), 2, "#5d5967")
 
 func draw_console_button(rect: Rect2, label: String, color: String) -> void:
-	rounded(rect.grow(2), 5, "#d8cec6", "#8a828d")
-	rounded(rect, 4, color, "#716a78")
+	rounded(rect.grow(2), 5, "#dad3cd", "#9b909a")
+	rounded(rect.grow(0.5), 4, "#4f4c5b")
+	rounded(rect, 4, color, "#817985")
+	var cap := rect.grow(-2.0)
+	gradient(Rect2(cap.position, Vector2(cap.size.x, 5.0)),
+		Color(color).lightened(0.24).to_html(), color)
+	line(Vector2(rect.position.x + 4, rect.end.y - 1.8),
+		Vector2(rect.end.x - 4, rect.end.y - 1.8), Color(color).darkened(0.22).to_html())
 	var center := rect.get_center()
 	draw_string(ThemeDB.fallback_font, Vector2(rect.position.x, center.y + 7), label,
 		HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 8, Color("#f9f1eb"))
