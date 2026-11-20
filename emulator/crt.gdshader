@@ -4,6 +4,7 @@ render_mode unshaded;
 uniform bool rgb565 = true;
 uniform bool scanlines = true;
 uniform int preset = 0;
+uniform vec2 glass_size = vec2(480.0, 360.0);
 
 void fragment() {
 	// Snes9x delivers a little-endian 16-bit pixel in the R and G bytes.
@@ -26,5 +27,10 @@ void fragment() {
 		rgb *= mask;
 	}
 	float scanline = scanlines && mod(floor(UV.y * 360.0), 4.0) == 0.0 ? 0.81 : 1.0;
-	COLOR = vec4(rgb * scanline, 1.0);
+	// Round and feather the aperture in room pixels.
+	float radius = 16.0;
+	vec2 corner = abs((UV - 0.5) * glass_size) - (glass_size * 0.5 - vec2(radius + 1.0));
+	float distance_to_glass = length(max(corner, vec2(0.0))) + min(max(corner.x, corner.y), 0.0) - radius;
+	float aperture = 1.0 - smoothstep(-4.0, 0.0, distance_to_glass);
+	COLOR = vec4(rgb * scanline, aperture);
 }

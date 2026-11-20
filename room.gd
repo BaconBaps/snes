@@ -65,7 +65,7 @@ func _ready() -> void:
 	dimmer_material.set_shader_parameter("screen_origin", SCREEN.position)
 	dimmer_material.set_shader_parameter("screen_size", SCREEN.size)
 	room_dimmer.material = dimmer_material
-	room_dimmer.color = Color("#0a081665")
+	room_dimmer.color = Color("#0a0816ca")
 	room_dimmer.size = Vector2(1152, 607)
 	room_dimmer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	room_dimmer.hide()
@@ -79,6 +79,7 @@ func _ready() -> void:
 	add_child(screen_spill)
 	var crt_material := ShaderMaterial.new()
 	crt_material.shader = preload("res://emulator/crt.gdshader")
+	crt_material.set_shader_parameter("glass_size", SCREEN.size)
 	crt.material = crt_material
 	crt.position = SCREEN.position
 	crt.size = SCREEN.size
@@ -544,7 +545,7 @@ func draw_television() -> void:
 	line(Vector2(700, 110), Vector2(700, 454), "#67546d")
 	rounded(Rect2(139, 84, 508, 387), 18, "#272432", "#6c5b6d")
 	rounded(Rect2(146, 90, 494, 374), 12, "#141623", "#181925")
-	draw_rect(TV_GLASS, Color("#171d2d"))
+	rounded(TV_GLASS, 16, "#171d2d")
 	if powered and rom_paths.is_empty():
 		gradient(TV_GLASS, "#25344e", "#5b4466")
 		var moon := Vector2(508, 209 + sin((Time.get_ticks_msec() - preview_started) / 480.0) * 8)
