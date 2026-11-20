@@ -21,7 +21,7 @@ const CEILING_LIGHT := Rect2(970, 60, 126, 62)
 const TV_OFFSET := Vector2(0, -55)
 const TV_GLASS := Rect2(153, 96, 480, 360)
 const SCREEN := Rect2(TV_GLASS.position + TV_OFFSET, TV_GLASS.size)
-const CART_SIZE := Vector2(122, 70)
+const CART_SIZE := Vector2(138, 72)
 const SEATED_CART_HEIGHT := 49.0
 const GRID_PAGE_SIZE := 6
 const STACK_PAGE_SIZE := 12
@@ -289,7 +289,7 @@ func desk_cartridge_at(point: Vector2) -> int:
 	return -1
 
 func console_position() -> Vector2:
-	var slot_lip := CONSOLE_TRANSFORM * Vector2(SLOT_ART.get_center().x, 536)
+	var slot_lip := CONSOLE_TRANSFORM * Vector2(SLOT_ART.get_center().x, SLOT_ART.end.y)
 	return slot_lip - Vector2(CART_SIZE.x / 2.0, SEATED_CART_HEIGHT + lift)
 
 func console_cartridge_height() -> float:
@@ -610,7 +610,7 @@ func draw_console() -> void:
 
 	# The top hatch sits behind the three controls, with its lip in front of the cartridge.
 	rounded(SLOT_ART.grow(4), 8, "#928c96")
-	rounded(SLOT_ART, 6, "#292634")
+	rounded(SLOT_ART, 6, "#a8a3ac" if seated else "#292634")
 	if inserted < 0 or dragging == inserted:
 		rounded(SLOT_ART.grow(-2), 5, "#696473", "#a5a0aa")
 		words("P A L   V E R S I O N", 379, 535, 7)
@@ -621,8 +621,6 @@ func draw_console() -> void:
 		# At rest the slot hides the shell immediately below the label.
 		cartridge(inserted, console_position(), console_cartridge_height())
 		draw_set_transform_matrix(CONSOLE_TRANSFORM)
-		if seated:
-			line(Vector2(352, 536), Vector2(479, 536), "#3e3547", 2)
 
 	draw_console_button(Rect2(321, 548, 39, BUTTON_HEIGHT), "POWER", "#575465")
 	var switch_y := 553 if powered else 558
