@@ -20,7 +20,7 @@ The ROM folder and preferences are saved in Godot’s per-user data folder. They
 
 Put a cropped label image next to its ROM or choose a separate directory under **Settings → Choose cartridge art folder**. Use the same filename before the extension, including any region tags. For example, pair `Super Mario Kart (Europe).sfc` with `Super Mario Kart (Europe).png`. PNG, JPG, and JPEG are supported. The separate artwork folder takes priority when both locations have a match. Games without matching artwork keep their generated labels.
 
-Artwork stretches to fill the rounded label area. Crop it to roughly 3.3:1 beforehand if you want to preserve its original proportions.
+Artwork stretches to fill the rounded label area. Crop it to roughly 3.7:1 beforehand if you want to preserve its original proportions.
 
 ## Room and emulation settings
 

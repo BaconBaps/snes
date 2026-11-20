@@ -4,7 +4,7 @@ const CONSOLE_FLOOR := 607.0
 const CONSOLE_HEIGHT_SCALE := 1.75
 const CONSOLE_TRANSFORM := Transform2D(Vector2.RIGHT, Vector2(0, CONSOLE_HEIGHT_SCALE),
 	Vector2(0, CONSOLE_FLOOR * (1.0 - CONSOLE_HEIGHT_SCALE)))
-const SLOT_ART := Rect2(347, 525, 137, 14)
+const SLOT_ART := Rect2(336, 520, 159, 14)
 const BUTTON_HEIGHT := 23.0 * 0.85
 const RESET_ART := Rect2(470, 548, 39, BUTTON_HEIGHT)
 const EJECT_ART := Rect2(376, 548, 77, BUTTON_HEIGHT)
@@ -21,8 +21,8 @@ const CEILING_LIGHT := Rect2(970, 60, 126, 62)
 const TV_OFFSET := Vector2(0, -55)
 const TV_GLASS := Rect2(153, 96, 480, 360)
 const SCREEN := Rect2(TV_GLASS.position + TV_OFFSET, TV_GLASS.size)
-const CART_SIZE := Vector2(138, 72 * 1.10)
-const LABEL_SIZE := Vector2(CART_SIZE.x - 16, 37)
+const CART_SIZE := Vector2(160, 84)
+const LABEL_SIZE := Vector2(CART_SIZE.x - 16, 39)
 const LABEL_RADIUS := 3
 const INSERT_SOUNDS := [
 	preload("res://audio/cartridge/insert_01.wav"),
@@ -45,7 +45,7 @@ const EJECT_SOUNDS := [
 	preload("res://audio/cartridge/eject_08.wav"),
 ]
 const SETTINGS_PATH := "user://settings.cfg"
-const SEATED_CART_HEIGHT := 49.0
+const SEATED_CART_HEIGHT := 52.0
 const GRID_PAGE_SIZE := 6
 const STACK_PAGE_SIZE := 12
 const STACK_ROW_SPACING := 28
@@ -537,8 +537,8 @@ func change_layout(index: int) -> void:
 
 func desk_position(index: int) -> Vector2:
 	var cell := index % page_size()
-	var row_spacing := STACK_ROW_SPACING if stacked else 81
-	return Vector2(799 + (cell % 2) * 164, (320 if stacked else 309) + floori(cell / 2.0) * row_spacing)
+	var row_spacing := STACK_ROW_SPACING if stacked else 85
+	return Vector2(785 + (cell % 2) * 168, (318 if stacked else 301) + floori(cell / 2.0) * row_spacing)
 
 func displayed_desk_position(index: int) -> Vector2:
 	return desk_position(index) + Vector2(0, stack_offsets.get(index, 0.0))
@@ -791,7 +791,7 @@ func press_at(point: Vector2) -> void:
 		powered = false
 		seated = false
 		eject_animation = create_tween()
-		eject_animation.tween_property(self, "lift", CART_SIZE.y - SEATED_CART_HEIGHT + 2.0, 0.17).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		eject_animation.tween_property(self, "lift", minf(CART_SIZE.y - SEATED_CART_HEIGHT + 2.0, console_position().y - SCREEN.end.y - 5.0), 0.17).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		message = "Drag the ejected cartridge back to the shoebox."
 	elif inserted >= 0 and not seated and Rect2(console_position(), Vector2(CART_SIZE.x, console_cartridge_height())).has_point(point):
 		dragging = inserted
@@ -1000,19 +1000,19 @@ func draw_shoebox() -> void:
 	rounded(Rect2(915, 262, 70, 14), 2, "#cfab8c35")
 
 	# The back and side walls frame the darker cardboard interior.
-	shape([Vector2(797, 293), Vector2(1094, 293), Vector2(1131, 556),
+	shape([Vector2(777, 293), Vector2(1120, 293), Vector2(1131, 556),
 		Vector2(751, 556)], "#a27c6e")
-	shape([Vector2(801, 299), Vector2(1090, 299), Vector2(1092, 324),
-		Vector2(797, 324)], "#63454a")
-	shape([Vector2(797, 319), Vector2(1092, 319), Vector2(1119, 553),
+	shape([Vector2(781, 299), Vector2(1115, 299), Vector2(1115, 324),
+		Vector2(781, 324)], "#63454a")
+	shape([Vector2(781, 319), Vector2(1115, 319), Vector2(1119, 553),
 		Vector2(764, 553)], "#5c4148")
-	shape([Vector2(796, 301), Vector2(799, 319), Vector2(774, 548),
+	shape([Vector2(777, 301), Vector2(781, 319), Vector2(774, 548),
 		Vector2(759, 553)], "#79574f")
-	shape([Vector2(1097, 302), Vector2(1123, 553), Vector2(1109, 548),
-		Vector2(1092, 319)], "#3d2b37")
-	line(Vector2(800, 293), Vector2(1092, 293), "#ca9a7d", 2)
-	line(Vector2(797, 294), Vector2(752, 555), "#c3947c", 2)
-	line(Vector2(1095, 294), Vector2(1130, 555), "#b38671", 2)
+	shape([Vector2(1120, 302), Vector2(1123, 553), Vector2(1109, 548),
+		Vector2(1115, 319)], "#3d2b37")
+	line(Vector2(779, 293), Vector2(1118, 293), "#ca9a7d", 2)
+	line(Vector2(777, 294), Vector2(752, 555), "#c3947c", 2)
+	line(Vector2(1120, 294), Vector2(1130, 555), "#b38671", 2)
 	for index in range(12):
 		var y := 330 + index * 18
 		line(Vector2(778 + (index * 13) % 79, y),
@@ -1097,11 +1097,12 @@ func draw_console() -> void:
 	rounded(SLOT_ART, 6, "#a8a3ac" if seated else "#292634")
 	if inserted < 0 or dragging == inserted:
 		rounded(SLOT_ART.grow(-2), 5, "#666373", "#a5a0aa")
-		line(Vector2(357, 528.5), Vector2(357, 535.5), "#494653")
-		line(Vector2(474, 528.5), Vector2(474, 535.5), "#494653")
-		draw_string(ThemeDB.fallback_font, Vector2(366, 533.7), "P A L   V E R S I O N",
-			HORIZONTAL_ALIGNMENT_CENTER, 99, 6, Color("#e4dce2"))
-		shape([Vector2(412, 535), Vector2(419, 535), Vector2(415.5, 537)], "#a7a0ad")
+		for x in [SLOT_ART.position.x + 10, SLOT_ART.end.x - 10]:
+			line(Vector2(x, SLOT_ART.position.y + 3.5), Vector2(x, SLOT_ART.end.y - 3.5), "#494653")
+		draw_string(ThemeDB.fallback_font, Vector2(SLOT_ART.get_center().x - 49.5, SLOT_ART.position.y + 8.7),
+			"P A L   V E R S I O N", HORIZONTAL_ALIGNMENT_CENTER, 99, 6, Color("#e4dce2"))
+		var arrow := Vector2(SLOT_ART.get_center().x, SLOT_ART.end.y - 4.0)
+		shape([arrow + Vector2(-3.5, 0), arrow + Vector2(3.5, 0), arrow + Vector2(0, 2)], "#a7a0ad")
 	if dragging >= 0 and SLOT.grow(20).has_point(pointer):
 		rounded(SLOT_ART.grow(3), 7, "#eab58975", "#ffdfad")
 	if inserted >= 0 and inserted != dragging:
@@ -1109,7 +1110,7 @@ func draw_console() -> void:
 		# At rest the slot hides the shell immediately below the label.
 		cartridge(inserted, console_position(), console_cartridge_height())
 		draw_set_transform_matrix(CONSOLE_TRANSFORM)
-	draw_texture_rect(preload("res://art/pal-console-slot-lip.png"), Rect2(340, 536, 151, 7), false)
+	draw_texture_rect(preload("res://art/pal-console-slot-lip.png"), Rect2(SLOT_ART.position.x - 7.0, SLOT_ART.end.y - 3.0, SLOT_ART.size.x + 14.0, 7.0), false)
 
 	draw_console_button(Rect2(321, 548, 39, BUTTON_HEIGHT), "POWER", "#575465")
 	var switch_y := 553 if powered else 558
