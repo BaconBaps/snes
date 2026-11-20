@@ -27,6 +27,10 @@ const SEATED_CART_HEIGHT := 49.0
 const GRID_PAGE_SIZE := 6
 const STACK_PAGE_SIZE := 12
 const STACK_ROW_SPACING := 28
+const POINTER_DEVICE := -100
+const STICK_DEADZONE := 0.20
+const TRIGGER_PRESS := 0.60
+const TRIGGER_RELEASE := 0.35
 const STACK_LIFT := Vector2(0, -22)
 const LABEL_COLORS := ["#367d80", "#a05261", "#646095", "#8b693c"]
 
@@ -52,6 +56,15 @@ var page := 0
 var stacked := true
 var hovered := -1
 var pointer := Vector2.ZERO
+var virtual_position := Vector2.ZERO
+var virtual_pointer_active := false
+var pointer_art: ImageTexture
+var left_trigger := false
+var right_trigger := false
+var previous_page_button := Button.new()
+var next_page_button := Button.new()
+var page_label := Label.new()
+var alphabet_button := MenuButton.new()
 var message := "Drag a cartridge into the console slot."
 var eject_animation: Tween
 var lift := 0.0:
@@ -99,6 +112,16 @@ func _ready() -> void:
 	emulator.failed.connect(show_emulator_error)
 
 	setup_settings()
+	setup_cartridge_navigation()
+	# Godot's built-in UI actions otherwise also react to SNES gameplay buttons.
+	for action in InputMap.get_actions():
+		if String(action).begins_with("ui_"):
+			for binding in InputMap.action_get_events(action):
+				if binding is InputEventJoypadButton or binding is InputEventJoypadMotion:
+					InputMap.action_erase_event(action, binding)
+	var cursor := Image.new()
+	cursor.load_svg_from_string('<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26"><circle cx="13" cy="13" r="9" fill="#2b2037" fill-opacity=".6" stroke="#ffe6bf" stroke-width="2"/><circle cx="13" cy="13" r="2" fill="#ffe6bf"/></svg>')
+	pointer_art = ImageTexture.create_from_image(cursor)
 
 	diagnostics.position = Vector2(163, 49)
 	diagnostics.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -298,8 +321,8 @@ func load_folder(path: String) -> void:
 	emulator.stop()
 	titles.clear()
 	rom_paths.clear()
-	var files := folder.get_files()
-	files.sort()
+	var files := Array(folder.get_files())
+	files.sort_custom(func(left: String, right: String): return left.naturalnocasecmp_to(right) < 0)
 	for file in files:
 		if file.get_extension().to_lower() in ["sfc", "smc"]:
 			titles.append(file.get_basename())
@@ -310,6 +333,8 @@ func load_folder(path: String) -> void:
 	seated = false
 	powered = false
 	page = 0
+	refresh_alphabet()
+	update_page_controls()
 	hovered = -1
 	reset_lift()
 	message = "No .sfc or .smc files in this folder." if titles.is_empty() else "Drag a cartridge into the console slot."
@@ -380,6 +405,7 @@ func change_layout(index: int) -> void:
 	stacked = index == 1
 	save_preferences()
 	page = floori(first_visible / float(page_size()))
+	update_page_controls()
 	hovered = -1
 	queue_redraw()
 
@@ -410,15 +436,82 @@ func console_position() -> Vector2:
 func console_cartridge_height() -> float:
 	return minf(CART_SIZE.y, SEATED_CART_HEIGHT + lift)
 
+func setup_cartridge_navigation() -> void:
+	var controls := HBoxContainer.new()
+	controls.position = Vector2(783, 575)
+	controls.size = Vector2(331, 26)
+	controls.add_theme_constant_override("separation", 8)
+	previous_page_button.text = "‹"
+	previous_page_button.tooltip_text = "Previous page"
+	previous_page_button.pressed.connect(func(): turn_page(-1))
+	next_page_button.text = "›"
+	next_page_button.tooltip_text = "Next page"
+	next_page_button.pressed.connect(func(): turn_page(1))
+	for button in [previous_page_button, next_page_button]:
+		button.custom_minimum_size = Vector2(34, 26)
+		button.focus_mode = Control.FOCUS_NONE
+	page_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	page_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	alphabet_button.text = "A–Z"
+	alphabet_button.tooltip_text = "Jump to a title by its first letter"
+	alphabet_button.focus_mode = Control.FOCUS_NONE
+	alphabet_button.get_popup().id_pressed.connect(jump_to_title)
+	for control in [previous_page_button, page_label, next_page_button, alphabet_button]:
+		controls.add_child(control)
+	add_child(controls)
+	refresh_alphabet()
+	update_page_controls()
+
+func page_count() -> int:
+	return maxi(1, ceili(titles.size() / float(page_size())))
+
+func turn_page(direction: int) -> void:
+	page = clampi(page + direction, 0, page_count() - 1)
+	hovered = -1
+	update_page_controls()
+	queue_redraw()
+
+func jump_to_title(index: int) -> void:
+	page = floori(index / float(page_size()))
+	hovered = -1
+	update_page_controls()
+	queue_redraw()
+
+func update_page_controls() -> void:
+	page_label.text = "%d / %d" % [page + 1, page_count()]
+	previous_page_button.disabled = page == 0
+	next_page_button.disabled = page >= page_count() - 1
+
+func refresh_alphabet() -> void:
+	var menu := alphabet_button.get_popup()
+	menu.clear()
+	var seen := {}
+	for index in range(titles.size()):
+		var letter := titles[index].left(1).to_upper()
+		if not "ABCDEFGHIJKLMNOPQRSTUVWXYZ".contains(letter) or letter.is_empty():
+			letter = "#"
+		if not seen.has(letter):
+			menu.add_item(letter, index)
+			seen[letter] = true
+	alphabet_button.disabled = menu.item_count == 0
+
 func _input(event: InputEvent) -> void:
-	if not dragging_plug:
-		return
 	if event is InputEventMouseMotion:
-		pointer = get_local_mouse_position()
-		queue_redraw()
+		if virtual_pointer_active and event.device != POINTER_DEVICE and event.position.distance_to(virtual_position) > 3.0:
+			hide_virtual_pointer()
+		if dragging_plug or dragging >= 0:
+			pointer = event.position
+			queue_redraw()
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
-		drop_plug(get_local_mouse_position())
-		get_viewport().set_input_as_handled()
+		if event.device != POINTER_DEVICE:
+			hide_virtual_pointer()
+		if dragging_plug:
+			drop_plug(event.position)
+			get_viewport().set_input_as_handled()
+		elif dragging >= 0:
+			drop_at(event.position)
+			queue_redraw()
+			get_viewport().set_input_as_handled()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -428,20 +521,93 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif event.keycode == KEY_F10:
 			diagnostics.visible = not diagnostics.visible
 	elif event is InputEventMouseMotion:
-		pointer = get_local_mouse_position()
+		pointer = event.position
 		hovered = desk_cartridge_at(pointer) if stacked and dragging < 0 and not dragging_plug else -1
 	elif event is InputEventMouseButton:
-		pointer = get_local_mouse_position()
-		if event.button_index == MOUSE_BUTTON_LEFT:
-			if event.pressed:
-				press_at(pointer)
-			elif dragging >= 0:
-				drop_at(pointer)
+		pointer = event.position
+		if event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			press_at(pointer)
 		elif event.pressed and DESK.has_point(pointer) and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
-			var direction := 1 if event.button_index == MOUSE_BUTTON_WHEEL_DOWN else -1
-			page = clampi(page + direction, 0, maxi(0, ceili(titles.size() / float(page_size())) - 1))
-			hovered = -1
+			turn_page(1 if event.button_index == MOUSE_BUTTON_WHEEL_DOWN else -1)
 	queue_redraw()
+
+func hide_virtual_pointer() -> void:
+	if virtual_pointer_active:
+		virtual_pointer_active = false
+		Input.set_custom_mouse_cursor(null)
+
+func update_gamepad_pointer(delta: float) -> void:
+	var pads := Input.get_connected_joypads()
+	if pads.is_empty():
+		if virtual_pointer_active:
+			dragging = -1
+			dragging_plug = false
+			queue_redraw()
+		hide_virtual_pointer()
+		left_trigger = false
+		right_trigger = false
+		return
+	var pad := pads[0]
+	var left := Vector2(Input.get_joy_axis(pad, JOY_AXIS_LEFT_X), Input.get_joy_axis(pad, JOY_AXIS_LEFT_Y))
+	var right := Vector2(Input.get_joy_axis(pad, JOY_AXIS_RIGHT_X), Input.get_joy_axis(pad, JOY_AXIS_RIGHT_Y))
+	var stick := left if left.length_squared() >= right.length_squared() else right
+	var strength := clampf((stick.length() - STICK_DEADZONE) / (1.0 - STICK_DEADZONE), 0.0, 1.0)
+	var focused := get_window().has_focus()
+	for window in get_viewport().get_embedded_subwindows():
+		focused = focused or window.has_focus()
+	if strength > 0.0 and focused:
+		move_virtual_pointer(stick.normalized() * strength * delta * 780.0)
+	var l2 := Input.get_joy_axis(pad, JOY_AXIS_TRIGGER_LEFT)
+	var r2 := Input.get_joy_axis(pad, JOY_AXIS_TRIGGER_RIGHT)
+	var l2_pressed := l2 >= (TRIGGER_RELEASE if left_trigger else TRIGGER_PRESS)
+	var r2_pressed := r2 >= (TRIGGER_RELEASE if right_trigger else TRIGGER_PRESS)
+	if focused and virtual_pointer_active:
+		if l2_pressed and not left_trigger:
+			virtual_interact(true)
+		elif r2_pressed and not right_trigger:
+			virtual_interact(false)
+	left_trigger = l2_pressed
+	right_trigger = r2_pressed
+
+func move_virtual_pointer(motion: Vector2) -> void:
+	var bounds := get_viewport_rect()
+	if not virtual_pointer_active:
+		virtual_position = get_viewport().get_mouse_position()
+		virtual_pointer_active = true
+		Input.set_custom_mouse_cursor(pointer_art, Input.CURSOR_ARROW, Vector2(13, 13))
+	virtual_position = (virtual_position + motion).clamp(bounds.position, bounds.end - Vector2.ONE)
+	get_viewport().warp_mouse(virtual_position)
+	var event := InputEventMouseMotion.new()
+	event.device = POINTER_DEVICE
+	event.position = virtual_position
+	event.global_position = virtual_position
+	get_viewport().push_input(event, true)
+
+func virtual_interact(grab: bool) -> void:
+	var carrying := dragging >= 0 or dragging_plug
+	if carrying:
+		if grab and dragging_plug:
+			drop_plug(virtual_position)
+		elif grab:
+			drop_at(virtual_position)
+		else:
+			dragging = -1
+			dragging_plug = false
+		queue_redraw()
+		return
+
+	# R2 activates room controls and menus. L2 can also pick up physical objects.
+	for pressed in [true, false]:
+		if not pressed and grab and (dragging >= 0 or dragging_plug):
+			break
+		var event := InputEventMouseButton.new()
+		event.device = POINTER_DEVICE
+		event.position = virtual_position
+		event.global_position = virtual_position
+		event.button_index = MOUSE_BUTTON_LEFT
+		event.button_mask = MOUSE_BUTTON_MASK_LEFT if pressed else 0
+		event.pressed = pressed
+		get_viewport().push_input(event, true)
 
 func press_at(point: Vector2) -> void:
 	var plug := player_two_plug_position()
@@ -500,6 +666,8 @@ func drop_plug(point: Vector2) -> void:
 	queue_redraw()
 
 func drop_at(point: Vector2) -> void:
+	if dragging < 0:
+		return
 	if SLOT.grow(20).has_point(point):
 		inserted = dragging
 		seated = true
@@ -530,6 +698,7 @@ func show_emulator_error(error: String) -> void:
 	queue_redraw()
 
 func _process(delta: float) -> void:
+	update_gamepad_pointer(delta)
 	var target := emulator.screen_light
 	if powered and rom_paths.is_empty():
 		target = Color("#496185")
@@ -650,8 +819,6 @@ func draw_desk() -> void:
 		line(Vector2(784, y), Vector2(1105, y), "#442f42", 2)
 	box(752, 556, 378, 15, "#704754")
 	line(Vector2(754, 556), Vector2(1128, 556), "#d49379", 2)
-	if titles.size() > page_size():
-		words("Scroll for more cartridges", 788, 589, 14)
 
 func draw_tv_stand() -> void:
 	# The console sits in front of the stand, with the TV's feet on its top.
