@@ -1033,12 +1033,14 @@ func draw_shoebox_front() -> void:
 func draw_tv_stand() -> void:
 	# The console sits in front of the stand, with the TV's feet on its top.
 	glow(Vector2(419, 535), Vector2(315, 30), Color("#120d1990"))
+	# The shelf passes behind the front legs, hiding both ends at the joints.
+	shape([Vector2(161, 517), Vector2(185, 493), Vector2(654, 493),
+		Vector2(679, 517)], "#473443")
+	gradient(Rect2(161, 517, 518, 10), "#795464", "#392737")
+	line(Vector2(161, 517), Vector2(679, 517), "#a275804f")
 	for x in [150, 668]:
 		gradient(Rect2(x, 454, 21, 83), "#5d414a", "#2d202e")
 		line(Vector2(x + 3, 456), Vector2(x + 3, 532), "#9a697253")
-	gradient(Rect2(163, 493, 514, 24), "#342837", "#4d3545")
-	gradient(Rect2(162, 517, 516, 10), "#795464", "#392737")
-	line(Vector2(164, 517), Vector2(676, 517), "#a275804f")
 	shape([Vector2(121, 443), Vector2(149, 427), Vector2(692, 427),
 		Vector2(718, 443)], "#5f4556")
 	gradient(Rect2(121, 443, 597, 12), "#836274", "#463242")
@@ -1115,15 +1117,34 @@ func draw_console() -> void:
 	draw_console_button(EJECT_ART, "EJECT", "#bcb9bf" if EJECT.has_point(pointer) else "#a6a1aa")
 	draw_console_button(RESET_ART, "RESET", "#817d90" if RESET.has_point(pointer) else "#626070")
 
-	draw_string(ThemeDB.fallback_font, Vector2(321, 578), "SUPER NINTENDO",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color("#494654"))
-	draw_string(ThemeDB.fallback_font, Vector2(321, 582.5), "ENTERTAINMENT SYSTEM",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 5, Color("#68616c"))
+	draw_console_wordmark()
 	if powered:
 		glow(Vector2(499, 579), Vector2(20, 8), Color("#ff4d5568"))
 		rounded(Rect2(492, 577.8, 14, 3), 2, "#ff3d5c")
 		line(Vector2(495, 578.3), Vector2(503, 578.3), "#ffacaf")
 	draw_set_transform(Vector2.ZERO)
+
+func draw_console_wordmark() -> void:
+	var font := ThemeDB.fallback_font
+	var title := "SUPER NINTENDO"
+	var subtitle := "ENTERTAINMENT SYSTEM"
+	var title_width := font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
+	draw_set_transform_matrix(CONSOLE_TRANSFORM * Transform2D(0.0, Vector2(1, 0.43), 0.0, Vector2(321, 578.7)))
+	draw_string(font, Vector2.ZERO, title, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color("#494654"))
+
+	var glyph_widths := PackedFloat32Array()
+	var subtitle_width := 0.0
+	for index in range(subtitle.length()):
+		var glyph_width := font.get_string_size(subtitle.substr(index, 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 5).x
+		glyph_widths.append(glyph_width)
+		subtitle_width += glyph_width
+	var tracking := (title_width - subtitle_width) / (subtitle.length() - 1)
+	draw_set_transform_matrix(CONSOLE_TRANSFORM * Transform2D(0.0, Vector2(1, 0.48), 0.0, Vector2(321, 581.9)))
+	var x := 0.0
+	for index in range(subtitle.length()):
+		draw_string(font, Vector2(x, 0), subtitle.substr(index, 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 5, Color("#68616c"))
+		x += glyph_widths[index] + tracking
+	draw_set_transform_matrix(CONSOLE_TRANSFORM)
 
 func draw_controller_plugs() -> void:
 	var first := seated_plug_position(PLAYER_ONE_SOCKET)
