@@ -22,6 +22,8 @@ const TV_OFFSET := Vector2(0, -55)
 const TV_GLASS := Rect2(153, 96, 480, 360)
 const SCREEN := Rect2(TV_GLASS.position + TV_OFFSET, TV_GLASS.size)
 const CART_SIZE := Vector2(138, 72 * 1.10)
+const LABEL_SIZE := Vector2(CART_SIZE.x - 16, 37)
+const LABEL_RADIUS := 3
 const SETTINGS_PATH := "user://settings.cfg"
 const SEATED_CART_HEIGHT := 49.0
 const GRID_PAGE_SIZE := 6
@@ -379,14 +381,27 @@ func cartridge_label_texture(index: int) -> Texture2D:
 			if path.is_empty():
 				continue
 			if image.load(path) == OK and not image.is_empty():
-				var ratio := minf(1.0, 512.0 / maxf(image.get_width(), image.get_height()))
-				if ratio < 1.0:
-					image.resize(maxi(1, roundi(image.get_width() * ratio)),
-						maxi(1, roundi(image.get_height() * ratio)), Image.INTERPOLATE_LANCZOS)
+				prepare_label_image(image)
 				texture = ImageTexture.create_from_image(image)
 				break
 		label_textures[title] = texture
 	return label_textures[title]
+
+func prepare_label_image(image: Image) -> void:
+	# Cache the stretched, antialiased label at twice its on-screen size.
+	var size := Vector2i(LABEL_SIZE * 2.0)
+	var radius := LABEL_RADIUS * 2
+	image.resize(size.x, size.y, Image.INTERPOLATE_LANCZOS)
+	image.convert(Image.FORMAT_RGBA8)
+	for x in range(radius):
+		for y in range(radius):
+			var distance := Vector2(radius - x - 0.5, radius - y - 0.5).length()
+			var coverage := clampf(radius + 0.5 - distance, 0.0, 1.0)
+			for corner_x in [x, size.x - 1 - x]:
+				for corner_y in [y, size.y - 1 - y]:
+					var pixel := image.get_pixel(corner_x, corner_y)
+					pixel.a *= coverage
+					image.set_pixel(corner_x, corner_y, pixel)
 
 func reset_lift() -> void:
 	if eject_animation:
@@ -758,17 +773,13 @@ func cartridge(index: int, at: Vector2, visible_height := CART_SIZE.y) -> void:
 		rounded(Rect2(at + Vector2(3, 5), shell), 5, "#221926a8")
 	rounded(Rect2(at, shell), 5, "#9d9aa4", "#c5bcc1")
 	gradient(Rect2(at + Vector2(5, 4), Vector2(CART_SIZE.x - 10, 43)), "#ccc6ca", "#a099a4")
-	var label := Rect2(at + Vector2(8, 8), Vector2(CART_SIZE.x - 16, 37))
+	var label := Rect2(at + Vector2(8, 8), LABEL_SIZE)
 	var art := cartridge_label_texture(index)
 	if art:
-		rounded(label, 3, "#36313b")
-		var image_area := label.grow(-1.0)
-		var image_size := art.get_size()
-		var scale_to_fit := minf(image_area.size.x / image_size.x, image_area.size.y / image_size.y)
-		var fitted_size := image_size * scale_to_fit
-		draw_texture_rect(art, Rect2(image_area.get_center() - fitted_size / 2.0, fitted_size), false)
+		rounded(label, LABEL_RADIUS, "#36313b")
+		draw_texture_rect(art, label, false)
 	else:
-		rounded(label, 3, LABEL_COLORS[index % LABEL_COLORS.size()])
+		rounded(label, LABEL_RADIUS, LABEL_COLORS[index % LABEL_COLORS.size()])
 		draw_circle(at + Vector2(CART_SIZE.x - 23, 18), 8, Color("#ffcf913c"), true, -1, true)
 		line(at + Vector2(13, 17), at + Vector2(53, 17), "#f8c992", 2)
 		words(titles[index], at.x + 13, at.y + 39, 11, int(CART_SIZE.x) - 26)
