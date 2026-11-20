@@ -4,9 +4,10 @@ const CONSOLE_FLOOR := 607.0
 const CONSOLE_HEIGHT_SCALE := 1.75
 const CONSOLE_TRANSFORM := Transform2D(Vector2.RIGHT, Vector2(0, CONSOLE_HEIGHT_SCALE),
 	Vector2(0, CONSOLE_FLOOR * (1.0 - CONSOLE_HEIGHT_SCALE)))
-const SLOT_ART := Rect2(331, 525, 169, 14)
-const RESET_ART := Rect2(470, 548, 39, 23)
-const EJECT_ART := Rect2(376, 548, 77, 23)
+const SLOT_ART := Rect2(347, 525, 137, 14)
+const BUTTON_HEIGHT := 23.0 * 0.85
+const RESET_ART := Rect2(470, 548, 39, BUTTON_HEIGHT)
+const EJECT_ART := Rect2(376, 548, 77, BUTTON_HEIGHT)
 const SLOT := CONSOLE_TRANSFORM * SLOT_ART
 const RESET := CONSOLE_TRANSFORM * RESET_ART
 const EJECT := CONSOLE_TRANSFORM * EJECT_ART
@@ -14,14 +15,15 @@ const DESK := Rect2(770, 301, 354, 246)
 const TV_OFFSET := Vector2(0, -55)
 const TV_GLASS := Rect2(153, 96, 480, 360)
 const SCREEN := Rect2(TV_GLASS.position + TV_OFFSET, TV_GLASS.size)
-const CART_SIZE := Vector2(158, 54)
-const SEATED_CART_HEIGHT := 42.0
+const CART_SIZE := Vector2(122, 70)
+const SEATED_CART_HEIGHT := 49.0
 const PAGE_SIZE := 6
 const LABEL_COLORS := ["#367d80", "#a05261", "#646095", "#8b693c"]
 
 var titles := PackedStringArray(["Star Hopper", "Midnight Rally", "Moon Orchard", "Wave Rider", "Snow Circuit", "Tiny Atlas"])
 var rom_paths := PackedStringArray()
 var emulator := preload("res://emulator/bridge.gd").new()
+var core_picker := OptionButton.new()
 var preview_started := 0
 var inserted := -1
 var dragging := -1
@@ -73,6 +75,13 @@ func _ready() -> void:
 	button.pressed.connect(func(): picker.popup_centered_ratio(0.8))
 	add_child(button)
 
+	core_picker.position = Vector2(980, 256)
+	core_picker.custom_minimum_size = Vector2(143, 34)
+	core_picker.tooltip_text = "Emulation core for the next cartridge"
+	for name in emulator.CORE_NAMES:
+		core_picker.add_item(name)
+	add_child(core_picker)
+
 func update_crt() -> void:
 	crt.texture = emulator.picture
 	crt.visible = crt.texture != null
@@ -109,7 +118,7 @@ func reset_lift() -> void:
 
 func desk_position(index: int) -> Vector2:
 	var cell := index % PAGE_SIZE
-	return Vector2(780 + (cell % 2) * 169, 333 + floori(cell / 2.0) * 68)
+	return Vector2(799 + (cell % 2) * 164, 320 + floori(cell / 2.0) * 73)
 
 func console_position() -> Vector2:
 	var slot_lip := CONSOLE_TRANSFORM * Vector2(SLOT_ART.get_center().x, 536)
@@ -179,7 +188,7 @@ func start_cartridge() -> void:
 		preview_started = Time.get_ticks_msec()
 		message = "CRT preview running. Choose a ROM folder to play."
 		return
-	var error: String = emulator.start(rom_paths[inserted])
+	var error: String = emulator.start(rom_paths[inserted], core_picker.selected)
 	if not error.is_empty():
 		show_emulator_error(error)
 		return
@@ -239,15 +248,15 @@ func cartridge(index: int, at: Vector2, visible_height := CART_SIZE.y) -> void:
 	if visible_height == CART_SIZE.y:
 		rounded(Rect2(at + Vector2(3, 5), shell), 5, "#221926a8")
 	rounded(Rect2(at, shell), 5, "#9d9aa4", "#c5bcc1")
-	gradient(Rect2(at + Vector2(5, 4), Vector2(CART_SIZE.x - 10, 36)), "#ccc6ca", "#a099a4")
-	var label := Rect2(at + Vector2(8, 8), Vector2(CART_SIZE.x - 16, 30))
+	gradient(Rect2(at + Vector2(5, 4), Vector2(CART_SIZE.x - 10, 43)), "#ccc6ca", "#a099a4")
+	var label := Rect2(at + Vector2(8, 8), Vector2(CART_SIZE.x - 16, 37))
 	rounded(label, 3, LABEL_COLORS[index % LABEL_COLORS.size()])
 	draw_circle(at + Vector2(CART_SIZE.x - 23, 18), 8, Color("#ffcf913c"), true, -1, true)
 	line(at + Vector2(13, 17), at + Vector2(53, 17), "#f8c992", 2)
-	words(titles[index], at.x + 13, at.y + 33, 11, int(CART_SIZE.x) - 26)
-	if visible_height > 46.0:
-		box(at.x + 8, at.y + 45, CART_SIZE.x - 16, minf(5.0, visible_height - 45.0), "#77717d")
-		line(at + Vector2(12, 46), at + Vector2(CART_SIZE.x - 12, 46), "#bbb0b6")
+	words(titles[index], at.x + 13, at.y + 39, 11, int(CART_SIZE.x) - 26)
+	if visible_height > 57.0:
+		box(at.x + 8, at.y + 56, CART_SIZE.x - 16, minf(7.0, visible_height - 56.0), "#77717d")
+		line(at + Vector2(12, 57), at + Vector2(CART_SIZE.x - 12, 57), "#bbb0b6")
 
 func draw_bedroom() -> void:
 	gradient(Rect2(0, 0, 1152, 405), "#292d49", "#796178")
@@ -308,16 +317,16 @@ func draw_desk() -> void:
 	gradient(Rect2(783, 514, 319, 64), "#8c5957", "#523545")
 	box(789, 562, 22, 41, "#593a46")
 	box(1079, 559, 20, 44, "#563741")
-	shape([Vector2(810, 292), Vector2(1099, 292), Vector2(1130, 525), Vector2(752, 525)], "#a77163")
-	shape([Vector2(819, 301), Vector2(1091, 301), Vector2(1115, 515), Vector2(769, 515)], "#74545b")
-	gradient(Rect2(785, 322, 311, 198), "#8b625f", "#6a4956")
-	for y in [327, 394, 462, 527]:
+	shape([Vector2(810, 292), Vector2(1099, 292), Vector2(1130, 539), Vector2(752, 539)], "#a77163")
+	shape([Vector2(819, 301), Vector2(1091, 301), Vector2(1115, 535), Vector2(769, 535)], "#74545b")
+	gradient(Rect2(785, 322, 311, 213), "#8b625f", "#6a4956")
+	for y in [316, 391, 464, 538]:
 		line(Vector2(784, y), Vector2(1105, y), "#442f42", 2)
-	box(752, 525, 378, 19, "#704754")
-	line(Vector2(754, 525), Vector2(1128, 525), "#d49379", 2)
+	box(752, 539, 378, 15, "#704754")
+	line(Vector2(754, 539), Vector2(1128, 539), "#d49379", 2)
 	words("Cartridge collection", 810, 240, 25)
 	if titles.size() > PAGE_SIZE:
-		words("Scroll for more cartridges", 788, 558, 14)
+		words("Scroll for more cartridges", 788, 572, 14)
 
 func draw_television() -> void:
 	draw_set_transform(TV_OFFSET)
@@ -394,9 +403,9 @@ func draw_console() -> void:
 		cartridge(inserted, console_position(), console_cartridge_height())
 		draw_set_transform_matrix(CONSOLE_TRANSFORM)
 		if seated:
-			line(Vector2(339, 536), Vector2(492, 536), "#3e3547", 2)
+			line(Vector2(352, 536), Vector2(479, 536), "#3e3547", 2)
 
-	draw_console_button(Rect2(321, 548, 39, 23), "POWER", "#575465")
+	draw_console_button(Rect2(321, 548, 39, BUTTON_HEIGHT), "POWER", "#575465")
 	var switch_y := 553 if powered else 558
 	line(Vector2(328, switch_y), Vector2(353, switch_y), "#b0a5ae", 2)
 	draw_console_button(EJECT_ART, "EJECT", "#bcb9bf" if EJECT.has_point(pointer) else "#a6a1aa")

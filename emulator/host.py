@@ -1,4 +1,4 @@
-"""Run the Snes9x libretro core and stream frames to the Godot room."""
+"""Run a SNES libretro core and stream frames to the Godot room."""
 
 import ctypes as c
 import os
@@ -131,7 +131,7 @@ class Emulator:
         self.core.retro_init()
         try:
             if not self.core.retro_load_game(c.byref(game)):
-                raise RuntimeError("Snes9x could not load this ROM.")
+                raise RuntimeError("The emulator core could not load this ROM.")
             try:
                 self.core.retro_set_controller_port_device(0, 1)
                 self.load_save()

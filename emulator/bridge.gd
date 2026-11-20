@@ -5,6 +5,9 @@ signal frame_changed
 
 var rgb565 := true
 
+const CORE_NAMES := ["Snes9x", "bsnes Balanced"]
+const CORE_FILES := ["snes9x_libretro", "bsnes_mercury_balanced_libretro"]
+const AUDIO_PREROLL_SECONDS := 0.07
 const HEADER_SIZE := 20
 const KEYS := [KEY_Z, KEY_A, KEY_SHIFT, KEY_ENTER, KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_X, KEY_S, KEY_Q, KEY_W]
 const GAMEPAD := [JOY_BUTTON_A, JOY_BUTTON_X, JOY_BUTTON_BACK, JOY_BUTTON_START,
@@ -24,24 +27,26 @@ var process_id := -1
 var sent_mask := -1
 var audio := AudioStreamPlayer.new()
 var playback: AudioStreamGeneratorPlayback
+var audio_preroll := PackedVector2Array()
 
 func _ready() -> void:
 	add_child(audio)
 	set_process(false)
 
-func start(rom: String) -> String:
+func start(rom: String, core_index := 0) -> String:
 	if process_id > 0 and OS.is_process_running(process_id):
 		return "The previous game is still closing. Try Reset in a moment."
 	var directory := ProjectSettings.globalize_path("res://emulator")
-	var core := directory.path_join("snes9x_libretro.dll" if OS.get_name() == "Windows" else "snes9x_libretro.so")
+	var extension := ".dll" if OS.get_name() == "Windows" else ".so"
+	var core := directory.path_join(CORE_FILES[core_index] + extension)
 	if not FileAccess.file_exists(core):
-		return "Add the Snes9x core to the emulator folder. See README."
+		return "Add %s to the emulator folder. See README." % core.get_file()
 	var save_dir := ProjectSettings.globalize_path("user://saves")
 	if DirAccess.make_dir_recursive_absolute(save_dir) != OK:
 		return "Could not create the battery save folder."
 	var save := save_dir.path_join(rom.sha256_text() + ".srm")
 	if server.listen(0, "127.0.0.1") != OK:
-		return "Could not open a local connection to Snes9x."
+		return "Could not open a local connection to the emulator core."
 	nonce = Crypto.new().generate_random_bytes(16).hex_encode().to_ascii_buffer()
 	var python := OS.get_environment("BEDROOM_ARCADE_PYTHON")
 	if python.is_empty():
@@ -70,6 +75,7 @@ func stop() -> void:
 	frame_changed.emit()
 	audio.stop()
 	playback = null
+	audio_preroll.clear()
 	running = false
 	set_process(false)
 
@@ -90,7 +96,7 @@ func _process(_delta: float) -> void:
 		peer.set_no_delay(true)
 	if not peer:
 		if Time.get_ticks_msec() >= deadline or not OS.is_process_running(process_id):
-			report_error("Snes9x did not start. Check the Python setup in README.")
+			report_error("The emulator core did not start. Check the Python setup in README.")
 		return
 	peer.poll()
 	var available := peer.get_available_bytes()
@@ -100,13 +106,13 @@ func _process(_delta: float) -> void:
 			incoming.append_array(received[1])
 	if not authenticated and incoming.size() >= nonce.size():
 		if incoming.slice(0, nonce.size()) != nonce:
-			report_error("Could not verify the local Snes9x connection.")
+			report_error("Could not verify the local emulator connection.")
 			return
 		authenticated = true
 		incoming = incoming.slice(nonce.size())
 		server.stop()
 	if not authenticated and Time.get_ticks_msec() >= deadline:
-		report_error("Snes9x connection timed out.")
+		report_error("The emulator core connection timed out.")
 		return
 	if authenticated:
 		read_frames()
@@ -117,7 +123,7 @@ func _process(_delta: float) -> void:
 			send_command(73, mask)
 			sent_mask = mask
 	if peer.get_status() != StreamPeerTCP.STATUS_CONNECTED:
-		report_error("The Snes9x process stopped.")
+		report_error("The emulator process stopped.")
 
 func read_frames() -> void:
 	var offset := 0
@@ -133,7 +139,7 @@ func read_frames() -> void:
 		var rate := incoming.decode_u32(offset + 12)
 		var payload_size := incoming.decode_u32(offset + 16)
 		if kind < 1 or kind > 3 or width > 1024 or height > 1024 or payload_size > 32768:
-			report_error("Invalid data from Snes9x.")
+			report_error("Invalid data from the emulator core.")
 			return
 		var start := offset + HEADER_SIZE
 		var video_end := start + width * height * 2
@@ -166,15 +172,31 @@ func read_frames() -> void:
 		incoming = incoming.slice(offset)
 
 func play_audio(rate: int, start: int, end: int) -> void:
-	if not playback:
-		var generator := AudioStreamGenerator.new()
-		generator.mix_rate = rate
-		generator.buffer_length = 0.15
-		audio.stream = generator
-		audio.play()
-		playback = audio.get_stream_playback()
-	for index in range(start, mini(end, start + playback.get_frames_available() * 4), 4):
-		playback.push_frame(Vector2(incoming.decode_s16(index), incoming.decode_s16(index + 2)) / 32768.0)
+	var frame_count := (end - start) >> 2
+	if playback:
+		frame_count = mini(frame_count, playback.get_frames_available())
+	var frames := PackedVector2Array()
+	frames.resize(frame_count)
+	for frame in range(frame_count):
+		var offset := start + frame * 4
+		frames[frame] = Vector2(incoming.decode_s16(offset), incoming.decode_s16(offset + 2)) / 32768.0
+	if playback:
+		playback.push_buffer(frames)
+		return
+
+	# Let a few core frames arrive before the audio thread starts consuming them.
+	audio_preroll.append_array(frames)
+	if audio_preroll.size() < rate * AUDIO_PREROLL_SECONDS:
+		return
+	var generator := AudioStreamGenerator.new()
+	generator.mix_rate_mode = AudioStreamGenerator.MIX_RATE_CUSTOM
+	generator.mix_rate = rate
+	generator.buffer_length = 0.2
+	audio.stream = generator
+	audio.play()
+	playback = audio.get_stream_playback()
+	playback.push_buffer(audio_preroll)
+	audio_preroll.clear()
 
 func read_input() -> int:
 	if not get_window().has_focus():

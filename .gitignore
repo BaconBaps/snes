@@ -4,3 +4,6 @@
 emulator/snes9x_libretro.dll
 emulator/snes9x_libretro.so
 __pycache__/
+
+emulator/bsnes_mercury_balanced_libretro.dll
+emulator/bsnes_mercury_balanced_libretro.so
