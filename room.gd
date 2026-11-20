@@ -100,13 +100,16 @@ var ceiling_light_on := true
 var scanlines_enabled := false
 var screen_spill := ColorRect.new()
 var screen_light := Color.BLACK
+var last_insert := -1
+var last_eject := -1
 var insert_sound := AudioStreamPlayer.new()
 var eject_sound := AudioStreamPlayer.new()
 var diagnostics := Label.new()
 
 func _ready() -> void:
-	setup_cartridge_audio(insert_sound, INSERT_SOUNDS)
-	setup_cartridge_audio(eject_sound, EJECT_SOUNDS)
+	for player in [insert_sound, eject_sound]:
+		player.volume_db = -7.0
+		add_child(player)
 	restore_preferences()
 	room_dimmer.color = Color("#0a0816ca")
 	room_dimmer.size = Vector2(1152, 607)
@@ -164,14 +167,17 @@ func _ready() -> void:
 	if not rom_folder.is_empty():
 		load_folder(rom_folder)
 
-func setup_cartridge_audio(player: AudioStreamPlayer, clips: Array) -> void:
-	var variations := AudioStreamRandomizer.new()
-	variations.playback_mode = AudioStreamRandomizer.PLAYBACK_RANDOM_NO_REPEATS
-	for clip in clips:
-		variations.add_stream(-1, clip)
-	player.stream = variations
-	player.volume_db = -7.0
-	add_child(player)
+func _exit_tree() -> void:
+	insert_sound.stop()
+	eject_sound.stop()
+
+func play_cartridge_sound(player: AudioStreamPlayer, clips: Array, previous: int) -> int:
+	var index := randi_range(0, clips.size() - 1)
+	if index == previous:
+		index = (index + randi_range(1, clips.size() - 1)) % clips.size()
+	player.stream = clips[index]
+	player.play()
+	return index
 
 func restore_preferences() -> void:
 	var config := ConfigFile.new()
@@ -680,7 +686,7 @@ func press_at(point: Vector2) -> void:
 			preview_started = Time.get_ticks_msec()
 			message = "CRT preview reset."
 	elif EJECT.has_point(point) and seated:
-		eject_sound.play()
+		last_eject = play_cartridge_sound(eject_sound, EJECT_SOUNDS, last_eject)
 		emulator.stop()
 		powered = false
 		seated = false
@@ -721,7 +727,7 @@ func drop_at(point: Vector2) -> void:
 		inserted = dragging
 		seated = true
 		reset_lift()
-		insert_sound.play()
+		last_insert = play_cartridge_sound(insert_sound, INSERT_SOUNDS, last_insert)
 		start_cartridge()
 	elif dragging == inserted and DESK.has_point(point):
 		inserted = -1
