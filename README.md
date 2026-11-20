@@ -16,6 +16,12 @@ The sample cartridges show a graphical preview without Python or a core. The cor
 
 The ROM folder and preferences are saved in Godot’s per-user data folder. They carry over when you extract an updated project and run it under the same user account.
 
+## Cartridge artwork
+
+Put a cropped label image next to its ROM or choose a separate directory under **Settings → Choose cartridge art folder**. Use the same filename before the extension, including any region tags. For example, pair `Super Mario Kart (Europe).sfc` with `Super Mario Kart (Europe).png`. PNG, JPG, and JPEG are supported. The separate artwork folder takes priority when both locations have a match. Games without matching artwork keep their generated labels.
+
+The project fits images inside the label area without stretching. For the best fit, crop the label to roughly 3.3:1 before adding it.
+
 ## Room and emulation settings
 
 Click the hanging light to dim the bedroom. The CRT image and its glow keep their brightness.

@@ -35,6 +35,10 @@ var rom_paths := PackedStringArray()
 var emulator := preload("res://emulator/bridge.gd").new()
 var core_picker := OptionButton.new()
 var rom_folder := ""
+var art_folder := ""
+var art_paths: Dictionary[String, String] = {}
+var sidecar_paths: Dictionary[String, String] = {}
+var label_textures: Dictionary[String, Texture2D] = {}
 var shader_preset := 1
 var preferred_core := 0
 var preview_started := 0
@@ -116,6 +120,7 @@ func restore_preferences() -> void:
 	if config.load(SETTINGS_PATH) != OK:
 		return
 	rom_folder = str(config.get_value("library", "rom_folder", ""))
+	art_folder = str(config.get_value("library", "art_folder", ""))
 	stacked = bool(config.get_value("library", "stacked", true))
 	ceiling_light_on = bool(config.get_value("room", "ceiling_light", true))
 	preferred_core = clampi(int(config.get_value("emulation", "core", 0)), 0, emulator.CORE_NAMES.size() - 1)
@@ -125,6 +130,7 @@ func restore_preferences() -> void:
 func save_preferences() -> void:
 	var config := ConfigFile.new()
 	config.set_value("library", "rom_folder", rom_folder)
+	config.set_value("library", "art_folder", art_folder)
 	config.set_value("library", "stacked", stacked)
 	config.set_value("room", "ceiling_light", ceiling_light_on)
 	config.set_value("emulation", "core", preferred_core)
@@ -137,7 +143,11 @@ func setup_settings() -> void:
 	var picker := FileDialog.new()
 	picker.access = FileDialog.ACCESS_FILESYSTEM
 	picker.file_mode = FileDialog.FILE_MODE_OPEN_DIR
-	picker.dir_selected.connect(load_folder)
+	picker.dir_selected.connect(func(path: String):
+		if picker.title == "Choose cartridge art folder":
+			load_art_folder(path)
+		else:
+			load_folder(path))
 	add_child(picker)
 
 	var settings := PopupPanel.new()
@@ -152,6 +162,7 @@ func setup_settings() -> void:
 	folder_button.text = "Choose ROM folder"
 	folder_button.pressed.connect(func():
 		settings.hide()
+		picker.title = "Choose ROM folder"
 		if DirAccess.dir_exists_absolute(rom_folder):
 			picker.current_dir = rom_folder
 		picker.popup_centered_ratio(0.8))
@@ -176,7 +187,7 @@ func setup_settings() -> void:
 	back.pressed.connect(func():
 		emulation_page.hide()
 		menu.show()
-		settings.size = Vector2i(300, 176))
+		settings.size = Vector2i(300, 198))
 	emulation_page.add_child(back)
 
 	var core_label := Label.new()
@@ -202,6 +213,17 @@ func setup_settings() -> void:
 	layout_picker.item_selected.connect(change_layout)
 	menu.add_child(layout_picker)
 
+	var art_button := Button.new()
+	art_button.text = "Choose cartridge art folder"
+	art_button.pressed.connect(func():
+		settings.hide()
+		picker.title = "Choose cartridge art folder"
+		var start_dir := art_folder if DirAccess.dir_exists_absolute(art_folder) else rom_folder
+		if DirAccess.dir_exists_absolute(start_dir):
+			picker.current_dir = start_dir
+		picker.popup_centered_ratio(0.8))
+	menu.add_child(art_button)
+
 	var gear := Button.new()
 	gear.name = "SettingsButton"
 	gear.text = "⚙"
@@ -215,7 +237,7 @@ func setup_settings() -> void:
 		queue_redraw()
 		emulation_page.hide()
 		menu.show()
-		settings.popup_centered(Vector2i(300, 176)))
+		settings.popup_centered(Vector2i(300, 198)))
 	add_child(gear)
 
 func add_emulation_controls(page_controls: VBoxContainer) -> void:
@@ -282,6 +304,7 @@ func load_folder(path: String) -> void:
 		if file.get_extension().to_lower() in ["sfc", "smc"]:
 			titles.append(file.get_basename())
 			rom_paths.append(path.path_join(file))
+	refresh_label_art()
 	inserted = -1
 	dragging = -1
 	seated = false
@@ -291,6 +314,54 @@ func load_folder(path: String) -> void:
 	reset_lift()
 	message = "No .sfc or .smc files in this folder." if titles.is_empty() else "Drag a cartridge into the console slot."
 	queue_redraw()
+
+func load_art_folder(path: String) -> void:
+	if not DirAccess.dir_exists_absolute(path):
+		message = "That artwork folder could not be opened."
+		queue_redraw()
+		return
+	art_folder = path
+	save_preferences()
+	refresh_label_art()
+	queue_redraw()
+
+func refresh_label_art() -> void:
+	art_paths = index_label_images(art_folder)
+	sidecar_paths = index_label_images(rom_folder)
+	label_textures.clear()
+
+func index_label_images(path: String) -> Dictionary[String, String]:
+	var images: Dictionary[String, String] = {}
+	if path.is_empty():
+		return images
+	var files := DirAccess.get_files_at(path)
+	files.sort()
+	for file in files:
+		if file.get_extension().to_lower() in ["png", "jpg", "jpeg"]:
+			var title := file.get_basename().to_lower()
+			if not images.has(title):
+				images[title] = path.path_join(file)
+	return images
+
+func cartridge_label_texture(index: int) -> Texture2D:
+	if index >= rom_paths.size():
+		return null
+	var title := titles[index].to_lower()
+	if not label_textures.has(title):
+		var image := Image.new()
+		var texture: Texture2D
+		for path in [art_paths.get(title, ""), sidecar_paths.get(title, "")]:
+			if path.is_empty():
+				continue
+			if image.load(path) == OK and not image.is_empty():
+				var ratio := minf(1.0, 512.0 / maxf(image.get_width(), image.get_height()))
+				if ratio < 1.0:
+					image.resize(maxi(1, roundi(image.get_width() * ratio)),
+						maxi(1, roundi(image.get_height() * ratio)), Image.INTERPOLATE_LANCZOS)
+				texture = ImageTexture.create_from_image(image)
+				break
+		label_textures[title] = texture
+	return label_textures[title]
 
 func reset_lift() -> void:
 	if eject_animation:
@@ -519,10 +590,19 @@ func cartridge(index: int, at: Vector2, visible_height := CART_SIZE.y) -> void:
 	rounded(Rect2(at, shell), 5, "#9d9aa4", "#c5bcc1")
 	gradient(Rect2(at + Vector2(5, 4), Vector2(CART_SIZE.x - 10, 43)), "#ccc6ca", "#a099a4")
 	var label := Rect2(at + Vector2(8, 8), Vector2(CART_SIZE.x - 16, 37))
-	rounded(label, 3, LABEL_COLORS[index % LABEL_COLORS.size()])
-	draw_circle(at + Vector2(CART_SIZE.x - 23, 18), 8, Color("#ffcf913c"), true, -1, true)
-	line(at + Vector2(13, 17), at + Vector2(53, 17), "#f8c992", 2)
-	words(titles[index], at.x + 13, at.y + 39, 11, int(CART_SIZE.x) - 26)
+	var art := cartridge_label_texture(index)
+	if art:
+		rounded(label, 3, "#36313b")
+		var image_area := label.grow(-1.0)
+		var image_size := art.get_size()
+		var scale_to_fit := minf(image_area.size.x / image_size.x, image_area.size.y / image_size.y)
+		var fitted_size := image_size * scale_to_fit
+		draw_texture_rect(art, Rect2(image_area.get_center() - fitted_size / 2.0, fitted_size), false)
+	else:
+		rounded(label, 3, LABEL_COLORS[index % LABEL_COLORS.size()])
+		draw_circle(at + Vector2(CART_SIZE.x - 23, 18), 8, Color("#ffcf913c"), true, -1, true)
+		line(at + Vector2(13, 17), at + Vector2(53, 17), "#f8c992", 2)
+		words(titles[index], at.x + 13, at.y + 39, 11, int(CART_SIZE.x) - 26)
 	if visible_height > 57.0:
 		box(at.x + 8, at.y + 56, CART_SIZE.x - 16, minf(7.0, visible_height - 56.0), "#77717d")
 		line(at + Vector2(12, 57), at + Vector2(CART_SIZE.x - 12, 57), "#bbb0b6")
