@@ -27,6 +27,8 @@ var authenticated := false
 var deadline := 0
 var process_id := -1
 var sent_mask := -1
+var sent_second_mask := -1
+var player_two_connected := false
 var audio := AudioStreamPlayer.new()
 var playback: AudioStreamGeneratorPlayback
 var audio_preroll := PackedVector2Array()
@@ -67,6 +69,7 @@ func start(rom: String, core_index := 0) -> String:
 	running = true
 	authenticated = false
 	sent_mask = -1
+	sent_second_mask = -1
 	received_frames = 0
 	displayed_frames = 0
 	previous_audio_skips = 0
@@ -95,7 +98,13 @@ func stop() -> void:
 
 func reset() -> void:
 	if authenticated:
-		send_command(82, sent_mask if sent_mask >= 0 else 0)
+		send_command(82, 0)
+
+func set_player_two(connected: bool) -> void:
+	player_two_connected = connected
+	sent_second_mask = -1
+	if running and authenticated:
+		send_command(80, int(connected))
 
 func _exit_tree() -> void:
 	stop()
@@ -129,6 +138,7 @@ func _process(_delta: float) -> void:
 		authenticated = true
 		incoming = incoming.slice(nonce.size())
 		server.stop()
+		send_command(80, int(player_two_connected))
 	if not authenticated and Time.get_ticks_msec() >= deadline:
 		report_error("The emulator core connection timed out.")
 		return
@@ -137,10 +147,7 @@ func _process(_delta: float) -> void:
 		if not running:
 			return
 		update_stats()
-		var mask := read_input()
-		if mask != sent_mask:
-			send_command(73, mask)
-			sent_mask = mask
+		send_inputs()
 	if peer.get_status() != StreamPeerTCP.STATUS_CONNECTED:
 		report_error("The emulator process stopped.")
 
@@ -238,13 +245,23 @@ func play_audio(rate: int, start: int, end: int) -> void:
 	playback.push_buffer(audio_preroll)
 	audio_preroll.clear()
 
-func read_input() -> int:
-	if not get_window().has_focus():
-		return 0
-	var mask := 0
+func send_inputs() -> void:
 	var devices := Input.get_connected_joypads()
+	var focused := get_window().has_focus()
+	var first := read_input(devices[0] if not devices.is_empty() else -1, true) if focused else 0
+	if first != sent_mask:
+		send_command(73, first)
+		sent_mask = first
+	if player_two_connected:
+		var second := read_input(devices[1], false) if focused and devices.size() > 1 else 0
+		if second != sent_second_mask:
+			send_command(74, second)
+			sent_second_mask = second
+
+func read_input(device: int, keyboard: bool) -> int:
+	var mask := 0
 	for index in range(KEYS.size()):
-		if Input.is_physical_key_pressed(KEYS[index]) or (not devices.is_empty() and Input.is_joy_button_pressed(devices[0], GAMEPAD[index])):
+		if (keyboard and Input.is_physical_key_pressed(KEYS[index])) or (device >= 0 and Input.is_joy_button_pressed(device, GAMEPAD[index])):
 			mask |= 1 << index
 	return mask
 

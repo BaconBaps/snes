@@ -11,6 +11,11 @@ const EJECT_ART := Rect2(376, 548, 77, BUTTON_HEIGHT)
 const SLOT := CONSOLE_TRANSFORM * SLOT_ART
 const RESET := CONSOLE_TRANSFORM * RESET_ART
 const EJECT := CONSOLE_TRANSFORM * EJECT_ART
+const PLAYER_ONE_SOCKET := CONSOLE_TRANSFORM * Rect2(355, 591, 35, 8)
+const PLAYER_TWO_SOCKET := CONSOLE_TRANSFORM * Rect2(440, 591, 35, 8)
+const PLUG_SIZE := Vector2(41, 22)
+const LOOSE_PLUG := Vector2(611, 556)
+const LOOSE_CABLE_END := Vector2(729, 601)
 const DESK := Rect2(770, 301, 354, 246)
 const TV_OFFSET := Vector2(0, -55)
 const TV_GLASS := Rect2(153, 96, 480, 360)
@@ -30,6 +35,8 @@ var core_picker := OptionButton.new()
 var preview_started := 0
 var inserted := -1
 var dragging := -1
+var dragging_plug := false
+var plug_grab_offset := Vector2.ZERO
 var seated := false
 var powered := false
 var page := 0
@@ -208,6 +215,16 @@ func console_position() -> Vector2:
 func console_cartridge_height() -> float:
 	return minf(CART_SIZE.y, SEATED_CART_HEIGHT + lift)
 
+func _input(event: InputEvent) -> void:
+	if not dragging_plug:
+		return
+	if event is InputEventMouseMotion:
+		pointer = get_local_mouse_position()
+		queue_redraw()
+	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
+		drop_plug(get_local_mouse_position())
+		get_viewport().set_input_as_handled()
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_F11:
@@ -217,7 +234,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			diagnostics.visible = not diagnostics.visible
 	elif event is InputEventMouseMotion:
 		pointer = get_local_mouse_position()
-		hovered = desk_cartridge_at(pointer) if stacked and dragging < 0 else -1
+		hovered = desk_cartridge_at(pointer) if stacked and dragging < 0 and not dragging_plug else -1
 	elif event is InputEventMouseButton:
 		pointer = get_local_mouse_position()
 		if event.button_index == MOUSE_BUTTON_LEFT:
@@ -232,7 +249,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	queue_redraw()
 
 func press_at(point: Vector2) -> void:
-	if RESET.has_point(point) and seated:
+	var plug := player_two_plug_position()
+	if dragging < 0 and Rect2(plug, PLUG_SIZE).has_point(point):
+		dragging_plug = true
+		plug_grab_offset = point - plug
+		pointer = point
+		hovered = -1
+		queue_redraw()
+	elif RESET.has_point(point) and seated:
 		if emulator.running:
 			emulator.reset()
 		elif not powered:
@@ -253,6 +277,26 @@ func press_at(point: Vector2) -> void:
 		dragging = desk_cartridge_at(point)
 		if dragging >= 0:
 			hovered = -1
+
+func seated_plug_position(socket: Rect2) -> Vector2:
+	return Vector2(socket.get_center().x - PLUG_SIZE.x / 2.0, socket.position.y - 1.0)
+
+func player_two_plug_position() -> Vector2:
+	if dragging_plug:
+		return pointer - plug_grab_offset
+	return seated_plug_position(PLAYER_TWO_SOCKET) if emulator.player_two_connected else LOOSE_PLUG
+
+func plug_over_socket(point: Vector2) -> bool:
+	var plug_center := point - plug_grab_offset + PLUG_SIZE / 2.0
+	return PLAYER_TWO_SOCKET.grow(14).has_point(plug_center)
+
+func drop_plug(point: Vector2) -> void:
+	var connected := plug_over_socket(point)
+	if connected != emulator.player_two_connected:
+		emulator.set_player_two(connected)
+		message = "Player 2 controller connected." if connected else "Player 2 controller disconnected."
+	dragging_plug = false
+	queue_redraw()
 
 func drop_at(point: Vector2) -> void:
 	if SLOT.grow(20).has_point(point):
@@ -511,10 +555,29 @@ func draw_console() -> void:
 		rounded(Rect2(x, 591, 35, 8), 3, "#34313c")
 		for pin in range(7):
 			draw_circle(Vector2(x + 4 + pin * 4.5, 595), 1.0, Color("#aa9892"))
-	rounded(Rect2(348, 591, 41, 13), 4, "#676271", "#8e8590")
-	line(Vector2(369, 603), Vector2(371, 608), "#37323e", 4)
-	line(Vector2(371, 608), Vector2(379, 611), "#37323e", 4)
 	draw_set_transform(Vector2.ZERO)
+
+func draw_controller_plugs() -> void:
+	var first := seated_plug_position(PLAYER_ONE_SOCKET)
+	var second := player_two_plug_position()
+	if dragging_plug and plug_over_socket(pointer):
+		rounded(PLAYER_TWO_SOCKET.grow(4), 5, "#a47b62", "#ffd7aa")
+	draw_controller_plug(first, Vector2(379, 608))
+	draw_controller_plug(second, LOOSE_CABLE_END)
+
+func draw_controller_plug(at: Vector2, cable_end: Vector2) -> void:
+	var start := at + Vector2(PLUG_SIZE.x / 2.0, PLUG_SIZE.y - 1.0)
+	var points := PackedVector2Array()
+	for index in range(17):
+		points.append(start.bezier_interpolate(start + Vector2(0, 31),
+			cable_end - Vector2(35, 9), cable_end, index / 16.0))
+	draw_polyline(points, Color("#292633"), 5.0, true)
+	draw_polyline(points, Color("#746e7a"), 2.0, true)
+	rounded(Rect2(at + Vector2(2, 3), PLUG_SIZE), 4, "#29263388")
+	rounded(Rect2(at, PLUG_SIZE), 4, "#676271", "#a49ba5")
+	line(at + Vector2(7, 5), at + Vector2(34, 5), "#a198a6")
+	rounded(Rect2(at + Vector2(8, 9), Vector2(25, 4)), 2, "#524e5e")
+	rounded(Rect2(start - Vector2(4, 3), Vector2(8, 7)), 2, "#5d5967")
 
 func draw_console_button(rect: Rect2, label: String, color: String) -> void:
 	rounded(rect.grow(2), 5, "#d8cec6", "#8a828d")
@@ -528,6 +591,7 @@ func _draw() -> void:
 	draw_desk()
 	draw_television()
 	draw_console()
+	draw_controller_plugs()
 	for index in visible_cartridges():
 		if index != inserted and index != dragging:
 			cartridge(index, displayed_desk_position(index))

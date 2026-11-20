@@ -35,7 +35,8 @@ class Emulator:
         self.save_path = save_path
         self.system_dir = os.fsencode(save_path.parent)
         self.pixel_format = 0
-        self.buttons = 0
+        self.buttons = [0, 0]
+        self.player_two_connected = False
         self.audio = bytearray()
         self.video = b""
         self.width = self.height = 0
@@ -105,9 +106,14 @@ class Emulator:
         return count
 
     def input_state(self, port, device, index, button):
-        if port == 0 and device == 1 and index == 0 and button < 12:
-            return (self.buttons >> button) & 1
+        if port < 2 and device == 1 and index == 0 and button < 12:
+            return (self.buttons[port] >> button) & 1
         return 0
+
+    def set_player_two(self, connected):
+        self.player_two_connected = connected
+        self.buttons[1] = 0
+        self.core.retro_set_controller_port_device(1, int(connected))
 
     def load_save(self):
         size = self.core.retro_get_memory_size(0)
@@ -134,6 +140,7 @@ class Emulator:
                 raise RuntimeError("The emulator core could not load this ROM.")
             try:
                 self.core.retro_set_controller_port_device(0, 1)
+                self.set_player_two(False)
                 self.load_save()
                 av = AVInfo()
                 self.core.retro_get_system_av_info(c.byref(av))
@@ -168,7 +175,12 @@ class Emulator:
                         return
                     if command == ord("R"):
                         self.core.retro_reset()
-                    self.buttons = mask
+                    elif command == ord("P"):
+                        self.set_player_two(bool(mask))
+                    elif command == ord("I"):
+                        self.buttons[0] = mask
+                    elif command == ord("J") and self.player_two_connected:
+                        self.buttons[1] = mask
                 if time.monotonic() < deadline:
                     continue
             self.audio.clear()
