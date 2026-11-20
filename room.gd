@@ -1,10 +1,10 @@
 extends Node2D
 
-const SLOT := Rect2(329, 505, 184, 23)
-const RESET := Rect2(276, 536, 88, 43)
-const EJECT := Rect2(473, 536, 88, 43)
-const DESK := Rect2(765, 306, 372, 253)
-const SCREEN := Rect2(241, 179, 328, 246)
+const SLOT := Rect2(346, 528, 137, 13)
+const RESET := Rect2(481, 546, 51, 27)
+const EJECT := Rect2(374, 547, 81, 22)
+const DESK := Rect2(770, 301, 354, 246)
+const SCREEN := Rect2(153, 96, 480, 360)
 const CART_SIZE := Vector2(92, 54)
 const PAGE_SIZE := 9
 const LABEL_COLORS := ["#367d80", "#a05261", "#646095", "#8b693c"]
@@ -51,7 +51,15 @@ func _ready() -> void:
 
 	var button := Button.new()
 	button.text = "Choose ROM folder"
-	button.position = Vector2(771, 244)
+	button.position = Vector2(810, 256)
+	button.custom_minimum_size = Vector2(165, 34)
+	for state in ["normal", "hover", "pressed"]:
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color("#594251") if state == "normal" else Color("#825b65")
+		style.border_color = Color("#ac7980")
+		style.set_border_width_all(1)
+		style.set_corner_radius_all(5)
+		button.add_theme_stylebox_override(state, style)
 	button.pressed.connect(func(): picker.popup_centered_ratio(0.8))
 	add_child(button)
 
@@ -94,7 +102,7 @@ func desk_position(index: int) -> Vector2:
 	return Vector2(788 + (cell % 3) * 111, 333 + floori(cell / 3.0) * 68)
 
 func console_position() -> Vector2:
-	return Vector2(375, 470 - lift)
+	return Vector2(369, 486 - lift)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F11:
@@ -179,87 +187,194 @@ func box(x: float, y: float, width: float, height: float, color: String) -> void
 func words(value: String, x: float, y: float, size: int, width := -1) -> void:
 	draw_string(ThemeDB.fallback_font, Vector2(x, y), value, HORIZONTAL_ALIGNMENT_LEFT, width, size, Color("#f9e4c5"))
 
+func gradient(rect: Rect2, top: String, bottom: String) -> void:
+	var points := PackedVector2Array([rect.position, Vector2(rect.end.x, rect.position.y),
+		rect.end, Vector2(rect.position.x, rect.end.y)])
+	draw_polygon(points, PackedColorArray([Color(top), Color(top), Color(bottom), Color(bottom)]))
+
+func shape(points: PackedVector2Array, color: String) -> void:
+	draw_colored_polygon(points, Color(color))
+
+func rounded(rect: Rect2, radius: int, fill: String, border: String = "") -> void:
+	var style := StyleBoxFlat.new()
+	style.set_corner_radius_all(radius)
+	style.bg_color = Color(fill)
+	if not border.is_empty():
+		style.border_color = Color(border)
+		style.set_border_width_all(1)
+	draw_style_box(style, rect)
+
+func glow(center: Vector2, size: Vector2, tint: Color) -> void:
+	var points := PackedVector2Array([center])
+	var colors := PackedColorArray([tint])
+	var edge := Color(tint, 0.0)
+	for step in range(65):
+		var angle := step * TAU / 64.0
+		points.append(center + Vector2(cos(angle), sin(angle)) * size)
+		colors.append(edge)
+	# Draw a triangle fan so the light fades smoothly to its perimeter.
+	for step in range(1, 65):
+		draw_polygon(PackedVector2Array([points[0], points[step], points[step + 1]]),
+			PackedColorArray([colors[0], colors[step], colors[step + 1]]))
+
+func line(from: Vector2, to: Vector2, color: String, width: float = 1.0) -> void:
+	draw_line(from, to, Color(color), width, true)
+
 func cartridge(index: int, at: Vector2) -> void:
-	draw_rect(Rect2(at + Vector2(4, 5), CART_SIZE), Color("#261d2c"))
-	draw_rect(Rect2(at, CART_SIZE), Color("#aaa5af"))
-	box(at.x + 4, at.y + 3, 84, 4, "#d1c8c6")
-	box(at.x + 8, at.y + 9, 76, 29, LABEL_COLORS[index % LABEL_COLORS.size()])
-	box(at.x + 11, at.y + 13, 21, 3, "#ffd18e")
-	words(titles[index], at.x + 11, at.y + 32, 10, 68)
-	box(at.x + 12, at.y + 46, 68, 5, "#82798b")
+	rounded(Rect2(at + Vector2(3, 5), CART_SIZE), 5, "#221926a8")
+	rounded(Rect2(at, CART_SIZE), 5, "#9d9aa4", "#c5bcc1")
+	gradient(Rect2(at + Vector2(5, 4), Vector2(82, 39)), "#ccc6ca", "#a099a4")
+	var label := Rect2(at + Vector2(8, 8), Vector2(76, 30))
+	rounded(label, 3, LABEL_COLORS[index % LABEL_COLORS.size()])
+	draw_circle(at + Vector2(69, 18), 8, Color("#ffcf913c"), true, -1, true)
+	line(at + Vector2(13, 17), at + Vector2(41, 17), "#f8c992", 2)
+	words(titles[index], at.x + 11, at.y + 33, 10, 68)
+	box(at.x + 8, at.y + 45, 76, 5, "#77717d")
+	line(at + Vector2(12, 46), at + Vector2(80, 46), "#bbb0b6")
 
-func _draw() -> void:
-	# Wallpaper, moonlit window, poster, and floorboards.
-	box(0, 0, 1152, 454, "#29304b")
-	for x in range(0, 1152, 38):
-		box(x, 0, 3, 454, "#333953")
-	box(0, 451, 1152, 13, "#514353")
-	box(0, 464, 1152, 184, "#51394a")
-	for y in [484, 512, 550, 601]:
-		box(0, y, 1152, 3, "#382b40")
-	box(52, 105, 156, 201, "#75617a")
-	box(60, 113, 140, 185, "#162743")
-	draw_circle(Vector2(150, 155), 18, Color("#e1ceaf"))
-	for star in [Vector2(73, 135), Vector2(92, 171), Vector2(174, 172), Vector2(181, 238)]:
-		draw_circle(star, 2, Color("#b4c7df"))
-	box(126, 113, 6, 185, "#665971")
-	box(60, 201, 140, 6, "#665971")
-	box(43, 298, 174, 10, "#8a6875")
-	box(642, 89, 79, 124, "#5a4871")
-	box(649, 96, 65, 110, "#346075")
-	draw_circle(Vector2(681, 141), 20, Color("#f0a275"))
-	box(650, 166, 63, 4, "#96a5ae")
-	box(770, 322, 351, 227, "#82564f")
-	box(757, 314, 378, 14, "#c0896a")
-	box(757, 543, 378, 15, "#b18164")
-	box(775, 558, 22, 53, "#64414a")
-	box(1095, 558, 22, 53, "#64414a")
-	words("Cartridge collection", 771, 223, 25)
+func draw_bedroom() -> void:
+	gradient(Rect2(0, 0, 1152, 405), "#292d49", "#796178")
+	for x in range(18, 1152, 31):
+		box(x, 0, 1, 405, "#d3a7b011")
+		box(x + 5, 0, 1, 405, "#291d381a")
+	glow(Vector2(923, 180), Vector2(320, 253), Color("#ec9c6c38"))
+	box(0, 400, 1152, 17, "#4b354d")
+	line(Vector2(0, 400), Vector2(1152, 400), "#a17881", 2)
+	gradient(Rect2(0, 417, 1152, 231), "#735052", "#392936")
+	for y in [437, 461, 491, 529, 576, 638]:
+		line(Vector2(0, y), Vector2(1152, y), "#281e2f89", 2)
+	for x in range(-250, 1500, 115):
+		line(Vector2(530 + (x - 530) * 0.54, 417), Vector2(x, 648), "#261b2e56")
 
-	# TV cabinet, glass, and scanlines.
-	box(229, 425, 398, 34, "#171829")
-	box(216, 151, 420, 293, "#77717f")
-	box(223, 158, 404, 277, "#494958")
-	box(231, 169, 349, 266, "#252635")
-	draw_rect(SCREEN, Color("#151c28"))
+	# Moonlit window and curtains behind the television.
+	rounded(Rect2(18, 36, 186, 264), 5, "#322840")
+	gradient(Rect2(30, 47, 162, 239), "#1a2349", "#8c6788")
+	glow(Vector2(83, 103), Vector2(34, 35), Color("#dfd4ff77"))
+	draw_circle(Vector2(83, 103), 18, Color("#f5dfcf"), true, -1, true)
+	for star in [Vector2(55, 79), Vector2(104, 66), Vector2(123, 127), Vector2(56, 150), Vector2(156, 84)]:
+		draw_circle(star, 1.45, Color("#fbdfd3"), true, -1, true)
+	box(109, 47, 6, 239, "#6a526f")
+	box(30, 161, 162, 6, "#71556f")
+	shape([Vector2(13, 42), Vector2(55, 42), Vector2(44, 173), Vector2(58, 292),
+		Vector2(13, 302)], "#53405f")
+	line(Vector2(32, 47), Vector2(27, 290), "#8a6482", 2)
+	box(10, 288, 195, 7, "#795970")
+
+	# Bedspread at the edge of the room.
+	rounded(Rect2(-47, 340, 133, 88), 19, "#756482")
+	shape([Vector2(-12, 387), Vector2(66, 388), Vector2(109, 450), Vector2(87, 532),
+		Vector2(-12, 545)], "#666078")
+	shape([Vector2(-12, 387), Vector2(66, 388), Vector2(109, 450), Vector2(-12, 461)], "#93839b")
+	for x in range(0, 87, 13):
+		line(Vector2(x, 400 + x * 0.55), Vector2(x - 8, 525), "#bda3b132")
+
+	# Woven rug under the console.
+	shape([Vector2(188, 483), Vector2(630, 483), Vector2(754, 600), Vector2(84, 600)], "#261c2b7f")
+	shape([Vector2(192, 481), Vector2(626, 481), Vector2(733, 594), Vector2(96, 594)], "#684958")
+	shape([Vector2(205, 488), Vector2(615, 488), Vector2(706, 581), Vector2(123, 581)], "#8c5d6a")
+	for y in range(491, 581, 4):
+		var side := (y - 491) * 0.85
+		line(Vector2(204 - side, y), Vector2(616 + side, y), "#d4928f24")
+	glow(Vector2(414, 492), Vector2(305, 115), Color("#161323a5"))
+
+func draw_desk() -> void:
+	# A warm desk lamp lights the cartridge tray.
+	box(1032, 162, 8, 133, "#4c3246")
+	line(Vector2(1036, 165), Vector2(1036, 284), "#e2a780", 2)
+	rounded(Rect2(1000, 282, 67, 10), 5, "#614354", "#b78570")
+	shape([Vector2(1004, 125), Vector2(1069, 125), Vector2(1090, 169), Vector2(981, 169)], "#8c575c")
+	shape([Vector2(1010, 126), Vector2(1063, 126), Vector2(1078, 166), Vector2(992, 166)], "#bc7f6f")
+	glow(Vector2(1035, 171), Vector2(95, 49), Color("#ffd3a576"))
+	line(Vector2(984, 169), Vector2(1087, 169), "#fac297", 3)
+
+	rounded(Rect2(777, 482, 336, 100), 5, "#30212e")
+	gradient(Rect2(783, 514, 319, 64), "#8c5957", "#523545")
+	box(789, 562, 22, 41, "#593a46")
+	box(1079, 559, 20, 44, "#563741")
+	shape([Vector2(810, 292), Vector2(1099, 292), Vector2(1130, 525), Vector2(752, 525)], "#a77163")
+	shape([Vector2(819, 301), Vector2(1091, 301), Vector2(1115, 515), Vector2(769, 515)], "#74545b")
+	gradient(Rect2(785, 322, 311, 198), "#8b625f", "#6a4956")
+	for y in [327, 394, 462, 527]:
+		line(Vector2(784, y), Vector2(1105, y), "#442f42", 2)
+	box(752, 525, 378, 19, "#704754")
+	line(Vector2(754, 525), Vector2(1128, 525), "#d49379", 2)
+	words("Cartridge collection", 810, 240, 25)
+	if titles.size() > PAGE_SIZE:
+		words("Scroll for more cartridges", 788, 558, 14)
+
+func draw_television() -> void:
+	# Thick molded cabinet and inset 4:3 glass.
+	shape([Vector2(139, 80), Vector2(707, 80), Vector2(733, 63), Vector2(178, 63)], "#887680")
+	shape([Vector2(708, 80), Vector2(733, 63), Vector2(733, 450), Vector2(708, 482)], "#3e354c")
+	rounded(Rect2(125, 75, 587, 414), 22, "#514859", "#a18a91")
+	rounded(Rect2(139, 84, 508, 387), 18, "#272432", "#6c5b6d")
+	rounded(Rect2(146, 90, 494, 374), 12, "#141623", "#181925")
+	draw_rect(SCREEN, Color("#171d2d"))
 	if powered and rom_paths.is_empty():
-		draw_rect(SCREEN, Color("#253951"))
-		draw_circle(Vector2(484, 258 + sin((Time.get_ticks_msec() - preview_started) / 360.0) * 8), 42, Color("#f4aa79"))
-		box(241, 327, 328, 98, "#2a5861")
-		box(241, 357, 328, 68, "#234550")
-		words("CRT PREVIEW", 260, 211, 13)
-		words(titles[inserted], 260, 318, 23, 292)
+		gradient(SCREEN, "#25344e", "#5b4466")
+		var moon := Vector2(508, 209 + sin((Time.get_ticks_msec() - preview_started) / 480.0) * 8)
+		glow(moon, Vector2(125, 115), Color("#f8ad8355"))
+		draw_circle(moon, 47, Color("#ecae89"), true, -1, true)
+		shape([Vector2(153, 380), Vector2(270, 298), Vector2(408, 382), Vector2(540, 261),
+			Vector2(633, 359), Vector2(633, 456), Vector2(153, 456)], "#334659")
+		shape([Vector2(153, 412), Vector2(337, 358), Vector2(454, 403), Vector2(633, 337),
+			Vector2(633, 456), Vector2(153, 456)], "#24313f")
+		words("CRT PREVIEW", 174, 126, 14)
+		words(titles[inserted], 174, 425, 27, 425)
 	else:
-		box(254, 189, 297, 5, "#283241")
-	for y in range(180, 425, 4):
-		draw_line(Vector2(241, y), Vector2(568, y), Color(0, 0, 0, 0.19))
-	for y in range(211, 336, 8):
-		box(588, y, 26, 3, "#303140")
-	draw_circle(Vector2(600, 403), 4, Color("#8bd6ae") if powered else Color("#272934"))
+		shape([Vector2(154, 97), Vector2(375, 97), Vector2(207, 286), Vector2(154, 299)], "#70a0c116")
+		line(Vector2(169, 109), Vector2(605, 109), "#b1aec331", 2)
+	for y in range(98, 456, 4):
+		line(Vector2(153, y), Vector2(633, y), "#090b1524")
+	for x in range(660, 696, 5):
+		rounded(Rect2(x, 137, 2, 163), 1, "#30293a")
+	rounded(Rect2(660, 382, 34, 29), 6, "#3e3446", "#78677b")
+	draw_circle(Vector2(677, 396), 7, Color("#827280"), true, -1, true)
+	draw_circle(Vector2(674, 442), 3, Color("#88cab5") if powered else Color("#322b39"))
+	box(153, 488, 530, 7, "#241b2a")
 
-	# The slot lip covers the cartridge base when seated.
-	box(243, 502, 355, 91, "#30263c")
-	box(248, 494, 345, 81, "#b4aabb")
-	box(248, 574, 345, 11, "#847b98")
-	draw_rect(SLOT, Color("#363248"))
+func draw_console() -> void:
+	# Grey and ivory shell, seen from slightly above.
+	shape([Vector2(286, 554), Vector2(540, 554), Vector2(572, 601), Vector2(259, 601)], "#251b32a5")
+	shape([Vector2(304, 512), Vector2(525, 512), Vector2(565, 560), Vector2(268, 560)], "#b7adb9")
+	shape([Vector2(304, 512), Vector2(525, 512), Vector2(536, 526), Vector2(292, 526)], "#ddd1cb")
+	rounded(Rect2(268, 556, 297, 35), 9, "#8b808e", "#c3b0b2")
+	rounded(Rect2(273, 566, 287, 23), 5, "#73687c")
+	shape([Vector2(313, 521), Vector2(514, 521), Vector2(545, 554), Vector2(286, 554)], "#a398a8")
+	rounded(SLOT.grow(3), 4, "#d4c5c2")
+	rounded(SLOT, 3, "#282330")
+	line(SLOT.position + Vector2(4, 11), SLOT.position + Vector2(SLOT.size.x - 4, 11), "#594b62")
 	if dragging >= 0 and SLOT.grow(20).has_point(pointer):
-		draw_rect(SLOT, Color("#f9d39d"), false, 2)
+		draw_rect(SLOT.grow(2), Color("#ffd3a4"), false, 2)
 	if inserted >= 0 and inserted != dragging:
 		cartridge(inserted, console_position())
 	if seated:
-		box(330, 516, 182, 12, "#9690a3")
-	draw_rect(RESET, Color("#8272a1") if RESET.has_point(pointer) else Color("#665883"))
-	draw_rect(EJECT, Color("#8272a1") if EJECT.has_point(pointer) else Color("#665883"))
-	words("RESET", 287, 562, 14)
-	words("EJECT", 485, 562, 14)
-	draw_circle(Vector2(374, 548), 4, Color("#fa795f") if powered else Color("#52445d"))
+		box(367, 532, 96, 9, "#9e92a0")
+		line(Vector2(367, 537), Vector2(463, 537), "#d9c7c2", 2)
+	rounded(Rect2(306, 546, 50, 27), 4, "#62596d", "#9f93a5")
+	line(Vector2(314, 550), Vector2(346, 550), "#93869b")
+	rounded(EJECT, 4, "#b1aab3" if EJECT.has_point(pointer) else "#938996", "#cebec0")
+	rounded(RESET, 4, "#7d7285" if RESET.has_point(pointer) else "#5d5568", "#a497a7")
+	words("EJECT", 395, 562, 11)
+	words("RESET", 489, 564, 11)
+	rounded(Rect2(308, 579, 27, 6), 2, "#4f323d")
+	if powered:
+		glow(Vector2(321, 582), Vector2(29, 13), Color("#ff505377"))
+		rounded(Rect2(309, 579, 25, 5), 2, "#ff494e")
+		line(Vector2(312, 580), Vector2(331, 580), "#ffb399")
+	for x in [393, 435]:
+		rounded(Rect2(x, 575, 29, 11), 3, "#494052", "#918294")
 
+func _draw() -> void:
+	draw_bedroom()
+	draw_desk()
+	draw_television()
+	draw_console()
 	for index in range(page * PAGE_SIZE, mini(titles.size(), (page + 1) * PAGE_SIZE)):
 		if index != inserted and index != dragging:
 			cartridge(index, desk_position(index))
-	if titles.size() > PAGE_SIZE:
-		words("Scroll for more cartridges", 783, 580, 14)
 	if dragging >= 0:
 		cartridge(dragging, pointer - CART_SIZE / 2.0)
-	words(message, 39, 620, 18, 920)
-	words("F11  Fullscreen", 989, 620, 16)
+	gradient(Rect2(0, 607, 1152, 41), "#271d2cca", "#1d1726")
+	words(message, 32, 633, 16, 920)
+	words("F11  Fullscreen", 994, 633, 15)

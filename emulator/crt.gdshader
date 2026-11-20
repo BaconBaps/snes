@@ -14,6 +14,6 @@ void fragment() {
 		float((pixel >> 5) & green_mask) / float(green_mask),
 		float(pixel & 31) / 31.0
 	);
-	float scanline = mod(floor(UV.y * 246.0), 4.0) == 0.0 ? 0.81 : 1.0;
+	float scanline = mod(floor(UV.y * 360.0), 4.0) == 0.0 ? 0.81 : 1.0;
 	COLOR = vec4(rgb * scanline, 1.0);
 }
