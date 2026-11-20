@@ -203,6 +203,55 @@ func save_preferences() -> void:
 	if config.save(SETTINGS_PATH) != OK:
 		push_warning("Could not save Bedroom Arcade settings.")
 
+func settings_style(fill: String, edge: String, radius: int) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(fill)
+	style.border_color = Color(edge)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(radius)
+	style.content_margin_left = 12
+	style.content_margin_right = 12
+	style.content_margin_top = 7
+	style.content_margin_bottom = 7
+	return style
+
+func make_settings_theme() -> Theme:
+	var theme := Theme.new()
+	theme.default_font_size = 15
+	var panel := settings_style("#211a2c", "#796078", 12)
+	panel.shadow_color = Color("#0a0714b9")
+	panel.shadow_size = 8
+	theme.set_stylebox("panel", "PopupPanel", panel)
+	theme.set_stylebox("panel", "PopupMenu", settings_style("#2b2035", "#796078", 6))
+	theme.set_stylebox("hover", "PopupMenu", settings_style("#654358", "#90697e", 4))
+	theme.set_color("font_color", "PopupMenu", Color("#f5e4db"))
+	theme.set_color("font_color", "Label", Color("#d9bbc8"))
+	var normal := settings_style("#36283e", "#685068", 6)
+	var hover := settings_style("#4e354d", "#ac7c8b", 6)
+	var pressed := settings_style("#654358", "#d4a591", 6)
+	var focus := settings_style("#00000000", "#edb99a", 6)
+	focus.draw_center = false
+	for control_type in ["Button", "OptionButton", "CheckButton"]:
+		theme.set_stylebox("normal", control_type, normal)
+		theme.set_stylebox("hover", control_type, hover)
+		theme.set_stylebox("pressed", control_type, pressed)
+		theme.set_stylebox("hover_pressed", control_type, pressed)
+		theme.set_stylebox("focus", control_type, focus)
+		theme.set_color("font_color", control_type, Color("#f5e4db"))
+		theme.set_color("font_hover_color", control_type, Color("#fff0db"))
+		theme.set_color("font_pressed_color", control_type, Color("#fff0db"))
+	return theme
+
+func add_settings_heading(menu: VBoxContainer, title: String) -> void:
+	var heading := Label.new()
+	heading.text = title
+	heading.add_theme_font_size_override("font_size", 23)
+	heading.add_theme_color_override("font_color", Color("#ffdbc0"))
+	menu.add_child(heading)
+	var divider := HSeparator.new()
+	divider.add_theme_stylebox_override("separator", settings_style("#796078", "#796078", 0))
+	menu.add_child(divider)
+
 func setup_settings() -> void:
 	var picker := FileDialog.new()
 	picker.access = FileDialog.ACCESS_FILESYSTEM
@@ -216,11 +265,14 @@ func setup_settings() -> void:
 
 	var settings := PopupPanel.new()
 	settings.name = "Settings"
+	settings.theme = make_settings_theme()
 	add_child(settings)
 	var menu := VBoxContainer.new()
-	menu.add_theme_constant_override("separation", 6)
+	menu.add_theme_constant_override("separation", 9)
 	settings.add_child(menu)
-	menu.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 12)
+	menu.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 17)
+
+	add_settings_heading(menu, "Settings")
 
 	var folder_button := Button.new()
 	folder_button.text = "Choose ROM folder"
@@ -233,9 +285,9 @@ func setup_settings() -> void:
 	menu.add_child(folder_button)
 
 	var emulation_page := VBoxContainer.new()
-	emulation_page.add_theme_constant_override("separation", 6)
+	emulation_page.add_theme_constant_override("separation", 9)
 	settings.add_child(emulation_page)
-	emulation_page.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 12)
+	emulation_page.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 17)
 	emulation_page.hide()
 
 	var emulation_button := Button.new()
@@ -243,16 +295,18 @@ func setup_settings() -> void:
 	emulation_button.pressed.connect(func():
 		menu.hide()
 		emulation_page.show()
-		settings.size = Vector2i(300, 302))
+		settings.popup_centered(Vector2i(344, 412)))
 	menu.add_child(emulation_button)
 
 	var back := Button.new()
-	back.text = "‹  Settings"
+	back.text = "‹  Back to settings"
+	back.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	back.pressed.connect(func():
 		emulation_page.hide()
 		menu.show()
-		settings.size = Vector2i(300, 198))
+		settings.popup_centered(Vector2i(344, 288)))
 	emulation_page.add_child(back)
+	add_settings_heading(emulation_page, "Emulation")
 
 	var core_label := Label.new()
 	core_label.text = "SNES core"
@@ -287,6 +341,10 @@ func setup_settings() -> void:
 			picker.current_dir = start_dir
 		picker.popup_centered_ratio(0.8))
 	menu.add_child(art_button)
+	menu.move_child(art_button, folder_button.get_index() + 1)
+	menu.move_child(emulation_button, menu.get_child_count() - 1)
+	for button in [folder_button, art_button, emulation_button]:
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 
 	var gear := Button.new()
 	gear.name = "SettingsButton"
@@ -301,11 +359,12 @@ func setup_settings() -> void:
 		queue_redraw()
 		emulation_page.hide()
 		menu.show()
-		settings.popup_centered(Vector2i(300, 198)))
+		settings.popup_centered(Vector2i(344, 288)))
 	add_child(gear)
 
 func add_emulation_controls(page_controls: VBoxContainer) -> void:
 	var state_buttons := HBoxContainer.new()
+	state_buttons.add_theme_constant_override("separation", 8)
 	for action in ["Save state", "Load state"]:
 		var button := Button.new()
 		button.text = action
@@ -317,6 +376,7 @@ func add_emulation_controls(page_controls: VBoxContainer) -> void:
 
 	var state_status := Label.new()
 	state_status.text = "One state per game and core"
+	state_status.add_theme_font_size_override("font_size", 13)
 	emulator.state_result.connect(func(result: String): state_status.text = result)
 	page_controls.add_child(state_status)
 
@@ -819,8 +879,9 @@ func cartridge(index: int, at: Vector2, visible_height := CART_SIZE.y) -> void:
 		Vector2(width - 2, 3), Vector2(width, 7)], "#ded8d4")
 	line(Vector2(8, 1.8), Vector2(width - 8, 1.8), "#f5ece0")
 	for x in [22.0, width - 22.0]:
-		line(Vector2(x + 1, 1.5), Vector2(x, 7), "#938a91")
-		line(Vector2(x + 2, 2), Vector2(x + 1, 7), "#eee5de")
+		var tilt := 1.0 if x < width / 2.0 else -1.0
+		line(Vector2(x + tilt, 1.5), Vector2(x, 7), "#938a91")
+		line(Vector2(x + tilt + 1, 2), Vector2(x + 1, 7), "#eee5de")
 
 	var body := PackedVector2Array([Vector2(0, 7), Vector2(width, 7),
 		Vector2(width - 2, visible_height - 4), Vector2(width - 6, visible_height),
