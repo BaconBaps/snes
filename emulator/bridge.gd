@@ -186,7 +186,7 @@ func read_frames() -> void:
 			var message_end := offset + HEADER_SIZE + payload_size
 			if message_end > incoming.size():
 				break
-			state_result.emit(incoming.slice(offset + HEADER_SIZE, message_end).get_string_from_utf8())
+			call_deferred("emit_signal", "state_result", incoming.slice(offset + HEADER_SIZE, message_end).get_string_from_utf8())
 			offset = message_end
 			continue
 		if kind < 1 or kind > 3 or width > 1024 or height > 1024 or payload_size > 32768:
