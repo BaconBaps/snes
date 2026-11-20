@@ -1,11 +1,12 @@
 extends Node2D
 
-const SLOT := Rect2(346, 528, 137, 13)
-const RESET := Rect2(481, 546, 51, 27)
-const EJECT := Rect2(374, 547, 81, 22)
+const SLOT := Rect2(331, 525, 169, 14)
+const RESET := Rect2(470, 548, 39, 23)
+const EJECT := Rect2(376, 548, 77, 23)
 const DESK := Rect2(770, 301, 354, 246)
 const SCREEN := Rect2(153, 96, 480, 360)
 const CART_SIZE := Vector2(92, 54)
+const SEATED_CART_SCALE := Vector2(1.72, 1.0)
 const PAGE_SIZE := 9
 const LABEL_COLORS := ["#367d80", "#a05261", "#646095", "#8b693c"]
 
@@ -102,7 +103,7 @@ func desk_position(index: int) -> Vector2:
 	return Vector2(788 + (cell % 3) * 111, 333 + floori(cell / 3.0) * 68)
 
 func console_position() -> Vector2:
-	return Vector2(369, 486 - lift)
+	return Vector2(SLOT.get_center().x - CART_SIZE.x * SEATED_CART_SCALE.x / 2.0, 482 - lift)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F11:
@@ -136,9 +137,9 @@ func press_at(point: Vector2) -> void:
 		powered = false
 		seated = false
 		eject_animation = create_tween()
-		eject_animation.tween_property(self, "lift", 29.0, 0.17).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		eject_animation.tween_property(self, "lift", 24.0, 0.17).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		message = "Drag the ejected cartridge back to the desk."
-	elif inserted >= 0 and not seated and Rect2(console_position(), CART_SIZE).has_point(point):
+	elif inserted >= 0 and not seated and Rect2(console_position(), CART_SIZE * SEATED_CART_SCALE).has_point(point):
 		dragging = inserted
 	elif inserted < 0:
 		for index in range(page * PAGE_SIZE, mini(titles.size(), (page + 1) * PAGE_SIZE)):
@@ -334,36 +335,72 @@ func draw_television() -> void:
 	box(153, 488, 530, 7, "#241b2a")
 
 func draw_console() -> void:
-	# Grey and ivory shell, seen from slightly above.
-	shape([Vector2(286, 554), Vector2(540, 554), Vector2(572, 601), Vector2(259, 601)], "#251b32a5")
-	shape([Vector2(304, 512), Vector2(525, 512), Vector2(565, 560), Vector2(268, 560)], "#b7adb9")
-	shape([Vector2(304, 512), Vector2(525, 512), Vector2(536, 526), Vector2(292, 526)], "#ddd1cb")
-	rounded(Rect2(268, 556, 297, 35), 9, "#8b808e", "#c3b0b2")
-	rounded(Rect2(273, 566, 287, 23), 5, "#73687c")
-	shape([Vector2(313, 521), Vector2(514, 521), Vector2(545, 554), Vector2(286, 554)], "#a398a8")
-	rounded(SLOT.grow(3), 4, "#d4c5c2")
-	rounded(SLOT, 3, "#282330")
-	line(SLOT.position + Vector2(4, 11), SLOT.position + Vector2(SLOT.size.x - 4, 11), "#594b62")
+	# The wide front and foreshortened top follow the angled PAL reference.
+	glow(Vector2(414, 587), Vector2(171, 27), Color("#201927b0"))
+	rounded(Rect2(277, 574, 277, 33), 14, "#958579", "#b4a297")
+	rounded(Rect2(282, 579, 267, 21), 9, "#aea195")
+	shape([Vector2(277, 581), Vector2(281, 571), Vector2(308, 508), Vector2(316, 501),
+		Vector2(514, 501), Vector2(523, 508), Vector2(552, 572), Vector2(554, 581),
+		Vector2(545, 588), Vector2(287, 588)], "#d9cbb8")
+	shape([Vector2(288, 579), Vector2(313, 508), Vector2(518, 508), Vector2(543, 579),
+		Vector2(536, 584), Vector2(294, 584)], "#e8ddcc")
+	line(Vector2(294, 586), Vector2(538, 586), "#f7e4cf", 2)
+	line(Vector2(281, 592), Vector2(550, 592), "#7c7069")
+	shape([Vector2(320, 511), Vector2(510, 511), Vector2(530, 568), Vector2(524, 574),
+		Vector2(305, 574), Vector2(301, 569)], "#918b94")
+	shape([Vector2(323, 511), Vector2(508, 511), Vector2(525, 567), Vector2(520, 571),
+		Vector2(310, 571), Vector2(306, 567)], "#aaa5af")
+	for x in range(330, 507, 7):
+		line(Vector2(x, 502), Vector2(x, 507), "#887d78", 2)
+
+	draw_circle(Vector2(503, 519), 5.5, Color("#817d89"), true, -1, true)
+	draw_circle(Vector2(502, 517), 1.55, Color("#72a9d3"), true, -1, true)
+	draw_circle(Vector2(506, 519), 1.55, Color("#df7773"), true, -1, true)
+	draw_circle(Vector2(500, 520), 1.55, Color("#83c49d"), true, -1, true)
+	draw_circle(Vector2(503, 522), 1.55, Color("#edc479"), true, -1, true)
+
+	# The top hatch sits behind the three controls, with its lip in front of the cartridge.
+	rounded(SLOT.grow(4), 8, "#928c96")
+	rounded(SLOT, 6, "#292634")
+	if inserted < 0 or dragging == inserted:
+		rounded(SLOT.grow(-2), 5, "#696473", "#a5a0aa")
+		words("P A L   V E R S I O N", 379, 535, 7)
 	if dragging >= 0 and SLOT.grow(20).has_point(pointer):
-		draw_rect(SLOT.grow(2), Color("#ffd3a4"), false, 2)
+		rounded(SLOT.grow(3), 7, "#eab58975", "#ffdfad")
 	if inserted >= 0 and inserted != dragging:
-		cartridge(inserted, console_position())
-	if seated:
-		box(367, 532, 96, 9, "#9e92a0")
-		line(Vector2(367, 537), Vector2(463, 537), "#d9c7c2", 2)
-	rounded(Rect2(306, 546, 50, 27), 4, "#62596d", "#9f93a5")
-	line(Vector2(314, 550), Vector2(346, 550), "#93869b")
-	rounded(EJECT, 4, "#b1aab3" if EJECT.has_point(pointer) else "#938996", "#cebec0")
-	rounded(RESET, 4, "#7d7285" if RESET.has_point(pointer) else "#5d5568", "#a497a7")
-	words("EJECT", 395, 562, 11)
-	words("RESET", 489, 564, 11)
-	rounded(Rect2(308, 579, 27, 6), 2, "#4f323d")
+		draw_set_transform(console_position(), 0.0, SEATED_CART_SCALE)
+		cartridge(inserted, Vector2.ZERO)
+		draw_set_transform(Vector2.ZERO)
+		line(Vector2(339, 536), Vector2(492, 536), "#3e3547", 2)
+
+	draw_console_button(Rect2(321, 548, 39, 23), "POWER", "#575465")
+	var switch_y := 553 if powered else 558
+	line(Vector2(328, switch_y), Vector2(353, switch_y), "#b0a5ae", 2)
+	draw_console_button(EJECT, "EJECT", "#bcb9bf" if EJECT.has_point(pointer) else "#a6a1aa")
+	draw_console_button(RESET, "RESET", "#817d90" if RESET.has_point(pointer) else "#626070")
+
+	draw_string(ThemeDB.fallback_font, Vector2(315, 583), "SUPER NINTENDO",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color("#494654"))
+	rounded(Rect2(490, 577, 18, 5), 3, "#786567", "#c4b2ae")
 	if powered:
-		glow(Vector2(321, 582), Vector2(29, 13), Color("#ff505377"))
-		rounded(Rect2(309, 579, 25, 5), 2, "#ff494e")
-		line(Vector2(312, 580), Vector2(331, 580), "#ffb399")
-	for x in [393, 435]:
-		rounded(Rect2(x, 575, 29, 11), 3, "#494052", "#918294")
+		glow(Vector2(499, 579), Vector2(24, 12), Color("#ff4d557f"))
+		rounded(Rect2(491, 577, 16, 5), 2, "#ff3d5c")
+
+	rounded(Rect2(335, 589, 157, 13), 7, "#b6a597", "#867a73")
+	for x in [355, 440]:
+		rounded(Rect2(x, 591, 35, 8), 3, "#34313c")
+		for pin in range(7):
+			draw_circle(Vector2(x + 4 + pin * 4.5, 595), 1.0, Color("#aa9892"))
+	rounded(Rect2(348, 591, 41, 13), 4, "#676271", "#8e8590")
+	line(Vector2(369, 603), Vector2(371, 608), "#37323e", 4)
+	line(Vector2(371, 608), Vector2(379, 611), "#37323e", 4)
+
+func draw_console_button(rect: Rect2, label: String, color: String) -> void:
+	rounded(rect.grow(2), 5, "#d8cec6", "#8a828d")
+	rounded(rect, 4, color, "#716a78")
+	var center := rect.get_center()
+	draw_string(ThemeDB.fallback_font, Vector2(rect.position.x, center.y + 7), label,
+		HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 8, Color("#f9f1eb"))
 
 func _draw() -> void:
 	draw_bedroom()
