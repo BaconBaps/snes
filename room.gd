@@ -16,12 +16,13 @@ const PLAYER_TWO_SOCKET := CONSOLE_TRANSFORM * Rect2(440, 591, 35, 8)
 const PLUG_SIZE := Vector2(41, 22)
 const LOOSE_PLUG := Vector2(611, 556)
 const LOOSE_CABLE_END := Vector2(729, 601)
-const DESK := Rect2(770, 301, 354, 246)
+const DESK := Rect2(770, 301, 354, 259)
 const CEILING_LIGHT := Rect2(970, 60, 126, 62)
 const TV_OFFSET := Vector2(0, -55)
 const TV_GLASS := Rect2(153, 96, 480, 360)
 const SCREEN := Rect2(TV_GLASS.position + TV_OFFSET, TV_GLASS.size)
-const CART_SIZE := Vector2(138, 72)
+const CART_SIZE := Vector2(138, 72 * 1.10)
+const SETTINGS_PATH := "user://settings.cfg"
 const SEATED_CART_HEIGHT := 49.0
 const GRID_PAGE_SIZE := 6
 const STACK_PAGE_SIZE := 12
@@ -33,6 +34,9 @@ var titles := PackedStringArray(["Star Hopper", "Midnight Rally", "Moon Orchard"
 var rom_paths := PackedStringArray()
 var emulator := preload("res://emulator/bridge.gd").new()
 var core_picker := OptionButton.new()
+var rom_folder := ""
+var shader_preset := 1
+var preferred_core := 0
 var preview_started := 0
 var inserted := -1
 var dragging := -1
@@ -60,10 +64,11 @@ var screen_light := Color.BLACK
 var diagnostics := Label.new()
 
 func _ready() -> void:
+	restore_preferences()
 	room_dimmer.color = Color("#0a0816ca")
 	room_dimmer.size = Vector2(1152, 607)
 	room_dimmer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	room_dimmer.hide()
+	room_dimmer.visible = not ceiling_light_on
 	add_child(room_dimmer)
 	var spill_material := ShaderMaterial.new()
 	spill_material.shader = preload("res://emulator/crt_spill.gdshader")
@@ -75,6 +80,8 @@ func _ready() -> void:
 	var crt_material := ShaderMaterial.new()
 	crt_material.shader = preload("res://emulator/crt.gdshader")
 	crt_material.set_shader_parameter("glass_size", SCREEN.size)
+	crt_material.set_shader_parameter("scanlines", scanlines_enabled)
+	crt_material.set_shader_parameter("preset", shader_preset)
 	crt.material = crt_material
 	crt.position = SCREEN.position
 	crt.size = SCREEN.size
@@ -101,6 +108,30 @@ func _ready() -> void:
 	diagnostics.add_theme_font_size_override("font_size", 12)
 	diagnostics.hide()
 	add_child(diagnostics)
+	if not rom_folder.is_empty():
+		load_folder(rom_folder)
+
+func restore_preferences() -> void:
+	var config := ConfigFile.new()
+	if config.load(SETTINGS_PATH) != OK:
+		return
+	rom_folder = str(config.get_value("library", "rom_folder", ""))
+	stacked = bool(config.get_value("library", "stacked", true))
+	ceiling_light_on = bool(config.get_value("room", "ceiling_light", true))
+	preferred_core = clampi(int(config.get_value("emulation", "core", 0)), 0, emulator.CORE_NAMES.size() - 1)
+	shader_preset = clampi(int(config.get_value("emulation", "shader_preset", 1)), 0, 2)
+	scanlines_enabled = bool(config.get_value("emulation", "scanlines", false))
+
+func save_preferences() -> void:
+	var config := ConfigFile.new()
+	config.set_value("library", "rom_folder", rom_folder)
+	config.set_value("library", "stacked", stacked)
+	config.set_value("room", "ceiling_light", ceiling_light_on)
+	config.set_value("emulation", "core", preferred_core)
+	config.set_value("emulation", "shader_preset", shader_preset)
+	config.set_value("emulation", "scanlines", scanlines_enabled)
+	if config.save(SETTINGS_PATH) != OK:
+		push_warning("Could not save Bedroom Arcade settings.")
 
 func setup_settings() -> void:
 	var picker := FileDialog.new()
@@ -121,6 +152,8 @@ func setup_settings() -> void:
 	folder_button.text = "Choose ROM folder"
 	folder_button.pressed.connect(func():
 		settings.hide()
+		if DirAccess.dir_exists_absolute(rom_folder):
+			picker.current_dir = rom_folder
 		picker.popup_centered_ratio(0.8))
 	menu.add_child(folder_button)
 
@@ -152,6 +185,10 @@ func setup_settings() -> void:
 	core_picker.tooltip_text = "Emulation core for the next cartridge"
 	for name in emulator.CORE_NAMES:
 		core_picker.add_item(name)
+	core_picker.select(preferred_core)
+	core_picker.item_selected.connect(func(index: int):
+		preferred_core = index
+		save_preferences())
 	emulation_page.add_child(core_picker)
 	add_emulation_controls(emulation_page)
 
@@ -203,6 +240,7 @@ func add_emulation_controls(page_controls: VBoxContainer) -> void:
 	scanlines.toggled.connect(func(enabled: bool):
 		scanlines_enabled = enabled
 		crt.material.set_shader_parameter("scanlines", enabled)
+		save_preferences()
 		queue_redraw())
 	page_controls.add_child(scanlines)
 
@@ -212,9 +250,11 @@ func add_emulation_controls(page_controls: VBoxContainer) -> void:
 	var shader_picker := OptionButton.new()
 	for preset in ["Standard", "Soft CRT", "RGB Mask"]:
 		shader_picker.add_item(preset)
-	shader_picker.select(1)
+	shader_picker.select(shader_preset)
 	shader_picker.item_selected.connect(func(index: int):
-		crt.material.set_shader_parameter("preset", index))
+		shader_preset = index
+		crt.material.set_shader_parameter("preset", index)
+		save_preferences())
 	page_controls.add_child(shader_picker)
 
 func update_crt() -> void:
@@ -230,6 +270,9 @@ func load_folder(path: String) -> void:
 		message = "That folder could not be opened."
 		queue_redraw()
 		return
+	if path != rom_folder:
+		rom_folder = path
+		save_preferences()
 	emulator.stop()
 	titles.clear()
 	rom_paths.clear()
@@ -264,14 +307,15 @@ func visible_cartridges() -> Array:
 func change_layout(index: int) -> void:
 	var first_visible := page * page_size()
 	stacked = index == 1
+	save_preferences()
 	page = floori(first_visible / float(page_size()))
 	hovered = -1
 	queue_redraw()
 
 func desk_position(index: int) -> Vector2:
 	var cell := index % page_size()
-	var row_spacing := STACK_ROW_SPACING if stacked else 73
-	return Vector2(799 + (cell % 2) * 164, 320 + floori(cell / 2.0) * row_spacing)
+	var row_spacing := STACK_ROW_SPACING if stacked else 81
+	return Vector2(799 + (cell % 2) * 164, (320 if stacked else 309) + floori(cell / 2.0) * row_spacing)
 
 func displayed_desk_position(index: int) -> Vector2:
 	return desk_position(index) + (STACK_LIFT if index == hovered else Vector2.ZERO)
@@ -333,6 +377,7 @@ func press_at(point: Vector2) -> void:
 	if CEILING_LIGHT.has_point(point) and dragging < 0:
 		ceiling_light_on = not ceiling_light_on
 		room_dimmer.visible = not ceiling_light_on
+		save_preferences()
 		queue_redraw()
 		return
 	if dragging < 0 and Rect2(plug, PLUG_SIZE).has_point(point):
@@ -354,7 +399,7 @@ func press_at(point: Vector2) -> void:
 		powered = false
 		seated = false
 		eject_animation = create_tween()
-		eject_animation.tween_property(self, "lift", 24.0, 0.17).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		eject_animation.tween_property(self, "lift", CART_SIZE.y - SEATED_CART_HEIGHT + 2.0, 0.17).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		message = "Drag the ejected cartridge back to the desk."
 	elif inserted >= 0 and not seated and Rect2(console_position(), Vector2(CART_SIZE.x, console_cartridge_height())).has_point(point):
 		dragging = inserted
@@ -514,19 +559,19 @@ func draw_desk() -> void:
 	gradient(Rect2(783, 514, 319, 64), "#8c5957", "#523545")
 	box(789, 562, 22, 41, "#593a46")
 	box(1079, 559, 20, 44, "#563741")
-	shape([Vector2(810, 292), Vector2(1099, 292), Vector2(1130, 539), Vector2(752, 539)], "#84596a")
-	shape([Vector2(819, 301), Vector2(1091, 301), Vector2(1115, 535), Vector2(769, 535)], "#593e52")
-	gradient(Rect2(785, 322, 311, 213), "#765160", "#4e3648")
+	shape([Vector2(810, 292), Vector2(1099, 292), Vector2(1130, 556), Vector2(752, 556)], "#84596a")
+	shape([Vector2(819, 301), Vector2(1091, 301), Vector2(1115, 552), Vector2(769, 552)], "#593e52")
+	gradient(Rect2(785, 322, 311, 230), "#765160", "#4e3648")
 	for index in range(27):
 		var y := 326 + index * 7
 		line(Vector2(788 + (index * 17) % 130, y),
 			Vector2(1093 - (index * 11) % 120, y + 1), "#d3a4b413")
-	for y in [316, 391, 464, 538]:
+	for y in [306, 387, 468, 555]:
 		line(Vector2(784, y), Vector2(1105, y), "#442f42", 2)
-	box(752, 539, 378, 15, "#704754")
-	line(Vector2(754, 539), Vector2(1128, 539), "#d49379", 2)
+	box(752, 556, 378, 15, "#704754")
+	line(Vector2(754, 556), Vector2(1128, 556), "#d49379", 2)
 	if titles.size() > page_size():
-		words("Scroll for more cartridges", 788, 572, 14)
+		words("Scroll for more cartridges", 788, 589, 14)
 
 func draw_tv_stand() -> void:
 	# The console sits in front of the stand, with the TV's feet on its top.
