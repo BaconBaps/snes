@@ -768,24 +768,57 @@ func line(from: Vector2, to: Vector2, color: String, width: float = 1.0) -> void
 	draw_line(from, to, Color(color), width, true)
 
 func cartridge(index: int, at: Vector2, visible_height := CART_SIZE.y) -> void:
-	var shell := Vector2(CART_SIZE.x, visible_height)
+	var width := CART_SIZE.x
+	draw_set_transform(at)
 	if visible_height == CART_SIZE.y:
-		rounded(Rect2(at + Vector2(3, 5), shell), 5, "#221926a8")
-	rounded(Rect2(at, shell), 5, "#9d9aa4", "#c5bcc1")
-	gradient(Rect2(at + Vector2(5, 4), Vector2(CART_SIZE.x - 10, 43)), "#ccc6ca", "#a099a4")
-	var label := Rect2(at + Vector2(8, 8), LABEL_SIZE)
+		rounded(Rect2(Vector2(3, 5), CART_SIZE), 6, "#18142596")
+
+	# The light catches the shallow top plane before rolling over the front edge.
+	shape([Vector2(0, 7), Vector2(2, 3), Vector2(8, 1), Vector2(width - 8, 1),
+		Vector2(width - 2, 3), Vector2(width, 7)], "#ded8d4")
+	line(Vector2(8, 1.8), Vector2(width - 8, 1.8), "#f5ece0")
+	for x in [22.0, width - 22.0]:
+		line(Vector2(x + 1, 1.5), Vector2(x, 7), "#938a91")
+		line(Vector2(x + 2, 2), Vector2(x + 1, 7), "#eee5de")
+
+	var body := PackedVector2Array([Vector2(0, 7), Vector2(width, 7),
+		Vector2(width - 2, visible_height - 4), Vector2(width - 6, visible_height),
+		Vector2(6, visible_height), Vector2(2, visible_height - 4)])
+	var top := Color("#c6c0c3")
+	var bottom := Color("#9e98a2")
+	draw_polygon(body, PackedColorArray([top, top, bottom, bottom, bottom, bottom]))
+	line(Vector2(1, 7), Vector2(width - 1, 7), "#f2e9e0")
+	line(Vector2(2, 10), Vector2(4, visible_height - 5), "#ddd5d4")
+	line(Vector2(width - 2, 10), Vector2(width - 4, visible_height - 5), "#807985")
+	for y in range(14, 31, 4):
+		line(Vector2(2, y), Vector2(5, y + 1), "#8f8994")
+		line(Vector2(width - 5, y + 1), Vector2(width - 2, y), "#8f8994")
+
+	var label := Rect2(Vector2(8, 8), LABEL_SIZE)
+	rounded(label.grow(0.75), LABEL_RADIUS + 1, "#e5ddda", "#a29aa1")
 	var art := cartridge_label_texture(index)
 	if art:
 		rounded(label, LABEL_RADIUS, "#36313b")
 		draw_texture_rect(art, label, false)
 	else:
 		rounded(label, LABEL_RADIUS, LABEL_COLORS[index % LABEL_COLORS.size()])
-		draw_circle(at + Vector2(CART_SIZE.x - 23, 18), 8, Color("#ffcf913c"), true, -1, true)
-		line(at + Vector2(13, 17), at + Vector2(53, 17), "#f8c992", 2)
-		words(titles[index], at.x + 13, at.y + 39, 11, int(CART_SIZE.x) - 26)
+		draw_circle(Vector2(width - 23, 18), 8, Color("#ffcf913c"), true, -1, true)
+		line(Vector2(13, 17), Vector2(53, 17), "#f8c992", 2)
+		words(titles[index], 13, 39, 11, int(width) - 26)
+
+	for x in [22.0, width - 22.0]:
+		line(Vector2(x, label.end.y + 1), Vector2(x, visible_height - 1), "#817983")
+		line(Vector2(x + 1, label.end.y + 1), Vector2(x + 1, visible_height - 1), "#c4bbc0")
 	if visible_height > 57.0:
-		box(at.x + 8, at.y + 56, CART_SIZE.x - 16, minf(7.0, visible_height - 56.0), "#77717d")
-		line(at + Vector2(12, 57), at + Vector2(CART_SIZE.x - 12, 57), "#bbb0b6")
+		var grip_height := minf(8.0, visible_height - 56.0)
+		rounded(Rect2(31, 56, width - 62, grip_height), 3, "#756e7b", "#d6cdd0")
+		for y in range(58, mini(62, floori(56 + grip_height))):
+			line(Vector2(35, y), Vector2(width - 35, y), "#9b929c")
+	if visible_height >= 74.0:
+		for x in [11.0, width - 11.0]:
+			draw_circle(Vector2(x, 71), 2.5, Color("#665e6a"), true, -1, true)
+			line(Vector2(x - 1, 71), Vector2(x + 1, 71), "#b5a9b2")
+	draw_set_transform(Vector2.ZERO)
 
 func draw_bedroom() -> void:
 	draw_texture_rect(preload("res://art/bedroom.jpg"), Rect2(0, 0, 1152, 648), false)
