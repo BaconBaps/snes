@@ -1,7 +1,7 @@
 extends Node2D
 
 const SLOT := Rect2(329, 505, 184, 23)
-const POWER := Rect2(276, 536, 88, 43)
+const RESET := Rect2(276, 536, 88, 43)
 const EJECT := Rect2(473, 536, 88, 43)
 const DESK := Rect2(765, 306, 372, 253)
 const SCREEN := Rect2(241, 179, 328, 246)
@@ -10,6 +10,9 @@ const PAGE_SIZE := 9
 const LABEL_COLORS := ["#367d80", "#a05261", "#646095", "#8b693c"]
 
 var titles := PackedStringArray(["Star Hopper", "Midnight Rally", "Moon Orchard", "Wave Rider", "Snow Circuit", "Tiny Atlas"])
+var rom_paths := PackedStringArray()
+var emulator := preload("res://emulator/bridge.gd").new()
+var preview_started := 0
 var inserted := -1
 var dragging := -1
 var seated := false
@@ -24,6 +27,10 @@ var lift := 0.0:
 		queue_redraw()
 
 func _ready() -> void:
+	add_child(emulator)
+	emulator.frame_changed.connect(queue_redraw)
+	emulator.failed.connect(show_emulator_error)
+
 	var picker := FileDialog.new()
 	picker.access = FileDialog.ACCESS_FILESYSTEM
 	picker.file_mode = FileDialog.FILE_MODE_OPEN_DIR
@@ -42,11 +49,15 @@ func load_folder(path: String) -> void:
 		message = "That folder could not be opened."
 		queue_redraw()
 		return
+	emulator.stop()
 	titles.clear()
-	for file in folder.get_files():
+	rom_paths.clear()
+	var files := folder.get_files()
+	files.sort()
+	for file in files:
 		if file.get_extension().to_lower() in ["sfc", "smc"]:
 			titles.append(file.get_basename())
-	titles.sort()
+			rom_paths.append(path.path_join(file))
 	inserted = -1
 	dragging = -1
 	seated = false
@@ -87,15 +98,16 @@ func _unhandled_input(event: InputEvent) -> void:
 	queue_redraw()
 
 func press_at(point: Vector2) -> void:
-	if POWER.has_point(point):
-		powered = seated and not powered
-		if powered:
-			message = "CRT preview running. Click Eject to release the cartridge."
-		elif seated:
-			message = "Power off. The cartridge is still in the slot."
+	if RESET.has_point(point) and seated:
+		if emulator.running:
+			emulator.reset()
+		elif not powered:
+			start_cartridge()
 		else:
-			message = "Insert a cartridge before switching on the console."
+			preview_started = Time.get_ticks_msec()
+			message = "CRT preview reset."
 	elif EJECT.has_point(point) and seated:
+		emulator.stop()
 		powered = false
 		seated = false
 		eject_animation = create_tween()
@@ -114,13 +126,35 @@ func drop_at(point: Vector2) -> void:
 		inserted = dragging
 		seated = true
 		reset_lift()
-		message = "Cartridge inserted. Click Power."
+		start_cartridge()
 	elif dragging == inserted and DESK.has_point(point):
 		page = floori(inserted / float(PAGE_SIZE))
 		inserted = -1
 		reset_lift()
 		message = "Drag a cartridge into the console slot."
 	dragging = -1
+
+func start_cartridge() -> void:
+	if rom_paths.is_empty():
+		powered = true
+		preview_started = Time.get_ticks_msec()
+		message = "CRT preview running. Choose a ROM folder to play."
+		return
+	var error: String = emulator.start(rom_paths[inserted])
+	if not error.is_empty():
+		show_emulator_error(error)
+		return
+	powered = true
+	message = "Reset restarts the game. Eject returns the cartridge."
+
+func show_emulator_error(error: String) -> void:
+	powered = false
+	message = error
+	queue_redraw()
+
+func _process(_delta: float) -> void:
+	if powered and rom_paths.is_empty():
+		queue_redraw()
 
 func box(x: float, y: float, width: float, height: float, color: String) -> void:
 	draw_rect(Rect2(x, y, width, height), Color(color))
@@ -171,9 +205,11 @@ func _draw() -> void:
 	box(223, 158, 404, 277, "#494958")
 	box(231, 169, 349, 266, "#252635")
 	draw_rect(SCREEN, Color("#151c28"))
-	if powered:
+	if emulator.picture:
+		draw_texture_rect(emulator.picture, SCREEN, false)
+	elif powered and rom_paths.is_empty():
 		draw_rect(SCREEN, Color("#253951"))
-		draw_circle(Vector2(484, 258), 42, Color("#f4aa79"))
+		draw_circle(Vector2(484, 258 + sin((Time.get_ticks_msec() - preview_started) / 360.0) * 8), 42, Color("#f4aa79"))
 		box(241, 327, 328, 98, "#2a5861")
 		box(241, 357, 328, 68, "#234550")
 		words("CRT PREVIEW", 260, 211, 13)
@@ -197,9 +233,9 @@ func _draw() -> void:
 		cartridge(inserted, console_position())
 	if seated:
 		box(330, 516, 182, 12, "#9690a3")
-	draw_rect(POWER, Color("#8272a1") if POWER.has_point(pointer) else Color("#665883"))
+	draw_rect(RESET, Color("#8272a1") if RESET.has_point(pointer) else Color("#665883"))
 	draw_rect(EJECT, Color("#8272a1") if EJECT.has_point(pointer) else Color("#665883"))
-	words("POWER", 287, 562, 14)
+	words("RESET", 287, 562, 14)
 	words("EJECT", 485, 562, 14)
 	draw_circle(Vector2(374, 548), 4, Color("#fa795f") if powered else Color("#52445d"))
 
@@ -210,5 +246,5 @@ func _draw() -> void:
 		words("Scroll for more cartridges", 783, 580, 14)
 	if dragging >= 0:
 		cartridge(dragging, pointer - CART_SIZE / 2.0)
-	words(message, 39, 620, 18)
+	words(message, 39, 620, 18, 920)
 	words("F11  Fullscreen", 989, 620, 16)

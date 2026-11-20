@@ -1,3 +1,6 @@
 .godot/
 *.sfc
 *.smc
+emulator/snes9x_libretro.dll
+emulator/snes9x_libretro.so
+__pycache__/
