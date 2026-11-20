@@ -1,13 +1,22 @@
 extends Node2D
 
-const SLOT := Rect2(331, 525, 169, 14)
-const RESET := Rect2(470, 548, 39, 23)
-const EJECT := Rect2(376, 548, 77, 23)
+const CONSOLE_FLOOR := 607.0
+const CONSOLE_HEIGHT_SCALE := 1.75
+const CONSOLE_TRANSFORM := Transform2D(Vector2.RIGHT, Vector2(0, CONSOLE_HEIGHT_SCALE),
+	Vector2(0, CONSOLE_FLOOR * (1.0 - CONSOLE_HEIGHT_SCALE)))
+const SLOT_ART := Rect2(331, 525, 169, 14)
+const RESET_ART := Rect2(470, 548, 39, 23)
+const EJECT_ART := Rect2(376, 548, 77, 23)
+const SLOT := CONSOLE_TRANSFORM * SLOT_ART
+const RESET := CONSOLE_TRANSFORM * RESET_ART
+const EJECT := CONSOLE_TRANSFORM * EJECT_ART
 const DESK := Rect2(770, 301, 354, 246)
-const SCREEN := Rect2(153, 96, 480, 360)
-const CART_SIZE := Vector2(92, 54)
-const SEATED_CART_SCALE := Vector2(1.72, 1.0)
-const PAGE_SIZE := 9
+const TV_OFFSET := Vector2(0, -55)
+const TV_GLASS := Rect2(153, 96, 480, 360)
+const SCREEN := Rect2(TV_GLASS.position + TV_OFFSET, TV_GLASS.size)
+const CART_SIZE := Vector2(158, 54)
+const SEATED_CART_HEIGHT := 42.0
+const PAGE_SIZE := 6
 const LABEL_COLORS := ["#367d80", "#a05261", "#646095", "#8b693c"]
 
 var titles := PackedStringArray(["Star Hopper", "Midnight Rally", "Moon Orchard", "Wave Rider", "Snow Circuit", "Tiny Atlas"])
@@ -100,10 +109,14 @@ func reset_lift() -> void:
 
 func desk_position(index: int) -> Vector2:
 	var cell := index % PAGE_SIZE
-	return Vector2(788 + (cell % 3) * 111, 333 + floori(cell / 3.0) * 68)
+	return Vector2(780 + (cell % 2) * 169, 333 + floori(cell / 2.0) * 68)
 
 func console_position() -> Vector2:
-	return Vector2(SLOT.get_center().x - CART_SIZE.x * SEATED_CART_SCALE.x / 2.0, 482 - lift)
+	var slot_lip := CONSOLE_TRANSFORM * Vector2(SLOT_ART.get_center().x, 536)
+	return slot_lip - Vector2(CART_SIZE.x / 2.0, SEATED_CART_HEIGHT + lift)
+
+func console_cartridge_height() -> float:
+	return minf(CART_SIZE.y, SEATED_CART_HEIGHT + lift)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F11:
@@ -139,7 +152,7 @@ func press_at(point: Vector2) -> void:
 		eject_animation = create_tween()
 		eject_animation.tween_property(self, "lift", 24.0, 0.17).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		message = "Drag the ejected cartridge back to the desk."
-	elif inserted >= 0 and not seated and Rect2(console_position(), CART_SIZE * SEATED_CART_SCALE).has_point(point):
+	elif inserted >= 0 and not seated and Rect2(console_position(), Vector2(CART_SIZE.x, console_cartridge_height())).has_point(point):
 		dragging = inserted
 	elif inserted < 0:
 		for index in range(page * PAGE_SIZE, mini(titles.size(), (page + 1) * PAGE_SIZE)):
@@ -221,17 +234,20 @@ func glow(center: Vector2, size: Vector2, tint: Color) -> void:
 func line(from: Vector2, to: Vector2, color: String, width: float = 1.0) -> void:
 	draw_line(from, to, Color(color), width, true)
 
-func cartridge(index: int, at: Vector2) -> void:
-	rounded(Rect2(at + Vector2(3, 5), CART_SIZE), 5, "#221926a8")
-	rounded(Rect2(at, CART_SIZE), 5, "#9d9aa4", "#c5bcc1")
-	gradient(Rect2(at + Vector2(5, 4), Vector2(82, 39)), "#ccc6ca", "#a099a4")
-	var label := Rect2(at + Vector2(8, 8), Vector2(76, 30))
+func cartridge(index: int, at: Vector2, visible_height := CART_SIZE.y) -> void:
+	var shell := Vector2(CART_SIZE.x, visible_height)
+	if visible_height == CART_SIZE.y:
+		rounded(Rect2(at + Vector2(3, 5), shell), 5, "#221926a8")
+	rounded(Rect2(at, shell), 5, "#9d9aa4", "#c5bcc1")
+	gradient(Rect2(at + Vector2(5, 4), Vector2(CART_SIZE.x - 10, 36)), "#ccc6ca", "#a099a4")
+	var label := Rect2(at + Vector2(8, 8), Vector2(CART_SIZE.x - 16, 30))
 	rounded(label, 3, LABEL_COLORS[index % LABEL_COLORS.size()])
-	draw_circle(at + Vector2(69, 18), 8, Color("#ffcf913c"), true, -1, true)
-	line(at + Vector2(13, 17), at + Vector2(41, 17), "#f8c992", 2)
-	words(titles[index], at.x + 11, at.y + 33, 10, 68)
-	box(at.x + 8, at.y + 45, 76, 5, "#77717d")
-	line(at + Vector2(12, 46), at + Vector2(80, 46), "#bbb0b6")
+	draw_circle(at + Vector2(CART_SIZE.x - 23, 18), 8, Color("#ffcf913c"), true, -1, true)
+	line(at + Vector2(13, 17), at + Vector2(53, 17), "#f8c992", 2)
+	words(titles[index], at.x + 13, at.y + 33, 11, int(CART_SIZE.x) - 26)
+	if visible_height > 46.0:
+		box(at.x + 8, at.y + 45, CART_SIZE.x - 16, minf(5.0, visible_height - 45.0), "#77717d")
+		line(at + Vector2(12, 46), at + Vector2(CART_SIZE.x - 12, 46), "#bbb0b6")
 
 func draw_bedroom() -> void:
 	gradient(Rect2(0, 0, 1152, 405), "#292d49", "#796178")
@@ -304,15 +320,18 @@ func draw_desk() -> void:
 		words("Scroll for more cartridges", 788, 558, 14)
 
 func draw_television() -> void:
-	# Thick molded cabinet and inset 4:3 glass.
-	shape([Vector2(139, 80), Vector2(707, 80), Vector2(733, 63), Vector2(178, 63)], "#887680")
-	shape([Vector2(708, 80), Vector2(733, 63), Vector2(733, 450), Vector2(708, 482)], "#3e354c")
+	draw_set_transform(TV_OFFSET)
+	# The front stays square to the viewer. The top recedes symmetrically.
+	shape([Vector2(130, 85), Vector2(151, 62), Vector2(686, 62), Vector2(707, 85)], "#80727e")
+	line(Vector2(155, 64), Vector2(682, 64), "#a49197", 2)
+	for x in range(536, 653, 7):
+		line(Vector2(x, 67), Vector2(x + 4, 73), "#514757")
 	rounded(Rect2(125, 75, 587, 414), 22, "#514859", "#a18a91")
 	rounded(Rect2(139, 84, 508, 387), 18, "#272432", "#6c5b6d")
 	rounded(Rect2(146, 90, 494, 374), 12, "#141623", "#181925")
-	draw_rect(SCREEN, Color("#171d2d"))
+	draw_rect(TV_GLASS, Color("#171d2d"))
 	if powered and rom_paths.is_empty():
-		gradient(SCREEN, "#25344e", "#5b4466")
+		gradient(TV_GLASS, "#25344e", "#5b4466")
 		var moon := Vector2(508, 209 + sin((Time.get_ticks_msec() - preview_started) / 480.0) * 8)
 		glow(moon, Vector2(125, 115), Color("#f8ad8355"))
 		draw_circle(moon, 47, Color("#ecae89"), true, -1, true)
@@ -333,10 +352,12 @@ func draw_television() -> void:
 	draw_circle(Vector2(677, 396), 7, Color("#827280"), true, -1, true)
 	draw_circle(Vector2(674, 442), 3, Color("#88cab5") if powered else Color("#322b39"))
 	box(153, 488, 530, 7, "#241b2a")
+	draw_set_transform(Vector2.ZERO)
 
 func draw_console() -> void:
 	# The wide front and foreshortened top follow the angled PAL reference.
 	glow(Vector2(414, 587), Vector2(171, 27), Color("#201927b0"))
+	draw_set_transform_matrix(CONSOLE_TRANSFORM)
 	rounded(Rect2(277, 574, 277, 33), 14, "#958579", "#b4a297")
 	rounded(Rect2(282, 579, 267, 21), 9, "#aea195")
 	shape([Vector2(277, 581), Vector2(281, 571), Vector2(308, 508), Vector2(316, 501),
@@ -360,24 +381,26 @@ func draw_console() -> void:
 	draw_circle(Vector2(503, 522), 1.55, Color("#edc479"), true, -1, true)
 
 	# The top hatch sits behind the three controls, with its lip in front of the cartridge.
-	rounded(SLOT.grow(4), 8, "#928c96")
-	rounded(SLOT, 6, "#292634")
+	rounded(SLOT_ART.grow(4), 8, "#928c96")
+	rounded(SLOT_ART, 6, "#292634")
 	if inserted < 0 or dragging == inserted:
-		rounded(SLOT.grow(-2), 5, "#696473", "#a5a0aa")
+		rounded(SLOT_ART.grow(-2), 5, "#696473", "#a5a0aa")
 		words("P A L   V E R S I O N", 379, 535, 7)
 	if dragging >= 0 and SLOT.grow(20).has_point(pointer):
-		rounded(SLOT.grow(3), 7, "#eab58975", "#ffdfad")
+		rounded(SLOT_ART.grow(3), 7, "#eab58975", "#ffdfad")
 	if inserted >= 0 and inserted != dragging:
-		draw_set_transform(console_position(), 0.0, SEATED_CART_SCALE)
-		cartridge(inserted, Vector2.ZERO)
 		draw_set_transform(Vector2.ZERO)
-		line(Vector2(339, 536), Vector2(492, 536), "#3e3547", 2)
+		# At rest the slot hides the shell immediately below the label.
+		cartridge(inserted, console_position(), console_cartridge_height())
+		draw_set_transform_matrix(CONSOLE_TRANSFORM)
+		if seated:
+			line(Vector2(339, 536), Vector2(492, 536), "#3e3547", 2)
 
 	draw_console_button(Rect2(321, 548, 39, 23), "POWER", "#575465")
 	var switch_y := 553 if powered else 558
 	line(Vector2(328, switch_y), Vector2(353, switch_y), "#b0a5ae", 2)
-	draw_console_button(EJECT, "EJECT", "#bcb9bf" if EJECT.has_point(pointer) else "#a6a1aa")
-	draw_console_button(RESET, "RESET", "#817d90" if RESET.has_point(pointer) else "#626070")
+	draw_console_button(EJECT_ART, "EJECT", "#bcb9bf" if EJECT.has_point(pointer) else "#a6a1aa")
+	draw_console_button(RESET_ART, "RESET", "#817d90" if RESET.has_point(pointer) else "#626070")
 
 	draw_string(ThemeDB.fallback_font, Vector2(315, 583), "SUPER NINTENDO",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color("#494654"))
@@ -394,6 +417,7 @@ func draw_console() -> void:
 	rounded(Rect2(348, 591, 41, 13), 4, "#676271", "#8e8590")
 	line(Vector2(369, 603), Vector2(371, 608), "#37323e", 4)
 	line(Vector2(371, 608), Vector2(379, 611), "#37323e", 4)
+	draw_set_transform(Vector2.ZERO)
 
 func draw_console_button(rect: Rect2, label: String, color: String) -> void:
 	rounded(rect.grow(2), 5, "#d8cec6", "#8a828d")
