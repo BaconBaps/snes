@@ -54,7 +54,7 @@ var lift := 0.0:
 var crt := TextureRect.new()
 var room_dimmer := ColorRect.new()
 var ceiling_light_on := true
-var scanlines_enabled := true
+var scanlines_enabled := false
 var screen_spill := ColorRect.new()
 var screen_light := Color.BLACK
 var diagnostics := Label.new()
@@ -199,7 +199,7 @@ func add_emulation_controls(page_controls: VBoxContainer) -> void:
 
 	var scanlines := CheckButton.new()
 	scanlines.text = "Scanlines"
-	scanlines.button_pressed = true
+	scanlines.button_pressed = scanlines_enabled
 	scanlines.toggled.connect(func(enabled: bool):
 		scanlines_enabled = enabled
 		crt.material.set_shader_parameter("scanlines", enabled)
@@ -212,6 +212,7 @@ func add_emulation_controls(page_controls: VBoxContainer) -> void:
 	var shader_picker := OptionButton.new()
 	for preset in ["Standard", "Soft CRT", "RGB Mask"]:
 		shader_picker.add_item(preset)
+	shader_picker.select(1)
 	shader_picker.item_selected.connect(func(index: int):
 		crt.material.set_shader_parameter("preset", index))
 	page_controls.add_child(shader_picker)
@@ -527,6 +528,22 @@ func draw_desk() -> void:
 	if titles.size() > page_size():
 		words("Scroll for more cartridges", 788, 572, 14)
 
+func draw_tv_stand() -> void:
+	# The console sits in front of the stand, with the TV's feet on its top.
+	glow(Vector2(419, 535), Vector2(315, 30), Color("#120d1990"))
+	for x in [150, 668]:
+		gradient(Rect2(x, 454, 21, 83), "#5d414a", "#2d202e")
+		line(Vector2(x + 3, 456), Vector2(x + 3, 532), "#9a697253")
+	gradient(Rect2(163, 493, 514, 24), "#342837", "#4d3545")
+	gradient(Rect2(162, 517, 516, 10), "#795464", "#392737")
+	line(Vector2(164, 517), Vector2(676, 517), "#a275804f")
+	shape([Vector2(121, 443), Vector2(149, 427), Vector2(692, 427),
+		Vector2(718, 443)], "#5f4556")
+	gradient(Rect2(121, 443, 597, 12), "#836274", "#463242")
+	line(Vector2(125, 443), Vector2(714, 443), "#ab80915c")
+	for x in [170, 646]:
+		rounded(Rect2(x, 434, 25, 7), 2, "#24202c")
+
 func draw_television() -> void:
 	draw_set_transform(TV_OFFSET)
 	# The front stays square to the viewer. The top recedes symmetrically.
@@ -660,6 +677,7 @@ func _draw() -> void:
 	draw_bedroom()
 	draw_ceiling_light()
 	draw_desk()
+	draw_tv_stand()
 	draw_television()
 	draw_console()
 	draw_controller_plugs()

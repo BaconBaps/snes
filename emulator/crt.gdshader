@@ -2,8 +2,8 @@ shader_type canvas_item;
 render_mode unshaded;
 
 uniform bool rgb565 = true;
-uniform bool scanlines = true;
-uniform int preset = 0;
+uniform bool scanlines = false;
+uniform int preset = 1;
 uniform vec2 glass_size = vec2(480.0, 360.0);
 
 void fragment() {
