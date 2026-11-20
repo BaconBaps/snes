@@ -33,6 +33,7 @@ class Emulator:
     def __init__(self, core_path, save_path):
         self.core = c.CDLL(str(core_path))
         self.save_path = save_path
+        self.state_path = save_path.with_suffix(f".{core_path.stem}.state")
         self.system_dir = os.fsencode(save_path.parent)
         self.pixel_format = 0
         self.buttons = [0, 0]
@@ -67,6 +68,12 @@ class Emulator:
         self.core.retro_get_memory_size.restype = SIZE
         self.core.retro_set_controller_port_device.argtypes = [UINT, UINT]
         self.core.retro_set_controller_port_device.restype = None
+        self.core.retro_serialize_size.argtypes = []
+        self.core.retro_serialize_size.restype = SIZE
+        for name in ("retro_serialize", "retro_unserialize"):
+            function = getattr(self.core, name)
+            function.argtypes = [VOID, SIZE]
+            function.restype = c.c_bool
 
     def environment(self, command, data):
         if command == 10:  # SET_PIXEL_FORMAT
@@ -130,6 +137,30 @@ class Emulator:
             temporary.write_bytes(c.string_at(address, size))
             temporary.replace(self.save_path)
 
+    def state_command(self, save):
+        try:
+            size = self.core.retro_serialize_size()
+            if size <= 0:
+                return "This core does not support save states for this game."
+            if save:
+                data = c.create_string_buffer(size)
+                if not self.core.retro_serialize(data, size):
+                    return "The core could not capture this save state."
+                temporary = self.state_path.with_suffix(".tmp")
+                temporary.write_bytes(data.raw)
+                temporary.replace(self.state_path)
+                return "State saved."
+            if not self.state_path.is_file():
+                return "No save state for this game and core."
+            if self.state_path.stat().st_size != size:
+                return "This state is incompatible with the current core."
+            data = c.create_string_buffer(self.state_path.read_bytes())
+            if not self.core.retro_unserialize(data, size):
+                return "The core could not load this state."
+            return "State loaded."
+        except OSError:
+            return "Could not access the save-state file."
+
     def run(self, connection, rom_path):
         rom = rom_path.read_bytes()
         buffer = c.create_string_buffer(rom)
@@ -175,6 +206,9 @@ class Emulator:
                         return
                     if command == ord("R"):
                         self.core.retro_reset()
+                    elif command in (ord("S"), ord("L")):
+                        message = self.state_command(command == ord("S")).encode("utf-8")
+                        connection.sendall(struct.pack("<IIIII", 5, 0, 0, 0, len(message)) + message)
                     elif command == ord("P"):
                         self.set_player_two(bool(mask))
                     elif command == ord("I"):

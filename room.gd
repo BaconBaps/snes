@@ -17,6 +17,7 @@ const PLUG_SIZE := Vector2(41, 22)
 const LOOSE_PLUG := Vector2(611, 556)
 const LOOSE_CABLE_END := Vector2(729, 601)
 const DESK := Rect2(770, 301, 354, 246)
+const CEILING_LIGHT := Rect2(970, 60, 126, 62)
 const TV_OFFSET := Vector2(0, -55)
 const TV_GLASS := Rect2(153, 96, 480, 360)
 const SCREEN := Rect2(TV_GLASS.position + TV_OFFSET, TV_GLASS.size)
@@ -51,11 +52,24 @@ var lift := 0.0:
 		queue_redraw()
 
 var crt := TextureRect.new()
+var room_dimmer := ColorRect.new()
+var ceiling_light_on := true
+var scanlines_enabled := true
 var screen_spill := ColorRect.new()
 var screen_light := Color.BLACK
 var diagnostics := Label.new()
 
 func _ready() -> void:
+	var dimmer_material := ShaderMaterial.new()
+	dimmer_material.shader = preload("res://emulator/room_dimmer.gdshader")
+	dimmer_material.set_shader_parameter("screen_origin", SCREEN.position)
+	dimmer_material.set_shader_parameter("screen_size", SCREEN.size)
+	room_dimmer.material = dimmer_material
+	room_dimmer.color = Color("#0a081665")
+	room_dimmer.size = Vector2(1152, 607)
+	room_dimmer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	room_dimmer.hide()
+	add_child(room_dimmer)
 	var spill_material := ShaderMaterial.new()
 	spill_material.shader = preload("res://emulator/crt_spill.gdshader")
 	screen_spill.material = spill_material
@@ -124,14 +138,16 @@ func setup_settings() -> void:
 	emulation_button.text = "Emulation  ›"
 	emulation_button.pressed.connect(func():
 		menu.hide()
-		emulation_page.show())
+		emulation_page.show()
+		settings.size = Vector2i(300, 302))
 	menu.add_child(emulation_button)
 
 	var back := Button.new()
 	back.text = "‹  Settings"
 	back.pressed.connect(func():
 		emulation_page.hide()
-		menu.show())
+		menu.show()
+		settings.size = Vector2i(300, 176))
 	emulation_page.add_child(back)
 
 	var core_label := Label.new()
@@ -141,6 +157,7 @@ func setup_settings() -> void:
 	for name in emulator.CORE_NAMES:
 		core_picker.add_item(name)
 	emulation_page.add_child(core_picker)
+	add_emulation_controls(emulation_page)
 
 	var layout_label := Label.new()
 	layout_label.text = "Cartridge view"
@@ -165,8 +182,43 @@ func setup_settings() -> void:
 		queue_redraw()
 		emulation_page.hide()
 		menu.show()
-		settings.popup_centered(Vector2i(264, 176)))
+		settings.popup_centered(Vector2i(300, 176)))
 	add_child(gear)
+
+func add_emulation_controls(page_controls: VBoxContainer) -> void:
+	var state_buttons := HBoxContainer.new()
+	for action in ["Save state", "Load state"]:
+		var button := Button.new()
+		button.text = action
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var save: bool = action == "Save state"
+		button.pressed.connect(func(): emulator.request_state(save))
+		state_buttons.add_child(button)
+	page_controls.add_child(state_buttons)
+
+	var state_status := Label.new()
+	state_status.text = "One state per game and core"
+	emulator.state_result.connect(func(result: String): state_status.text = result)
+	page_controls.add_child(state_status)
+
+	var scanlines := CheckButton.new()
+	scanlines.text = "Scanlines"
+	scanlines.button_pressed = true
+	scanlines.toggled.connect(func(enabled: bool):
+		scanlines_enabled = enabled
+		crt.material.set_shader_parameter("scanlines", enabled)
+		queue_redraw())
+	page_controls.add_child(scanlines)
+
+	var shader_label := Label.new()
+	shader_label.text = "Shader preset"
+	page_controls.add_child(shader_label)
+	var shader_picker := OptionButton.new()
+	for preset in ["Standard", "Soft CRT", "RGB Mask"]:
+		shader_picker.add_item(preset)
+	shader_picker.item_selected.connect(func(index: int):
+		crt.material.set_shader_parameter("preset", index))
+	page_controls.add_child(shader_picker)
 
 func update_crt() -> void:
 	if crt.texture != emulator.picture:
@@ -281,6 +333,11 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func press_at(point: Vector2) -> void:
 	var plug := player_two_plug_position()
+	if CEILING_LIGHT.has_point(point) and dragging < 0:
+		ceiling_light_on = not ceiling_light_on
+		room_dimmer.visible = not ceiling_light_on
+		queue_redraw()
+		return
 	if dragging < 0 and Rect2(plug, PLUG_SIZE).has_point(point):
 		dragging_plug = true
 		plug_grab_offset = point - plug
@@ -430,7 +487,8 @@ func cartridge(index: int, at: Vector2, visible_height := CART_SIZE.y) -> void:
 
 func draw_bedroom() -> void:
 	draw_texture_rect(preload("res://art/bedroom.jpg"), Rect2(0, 0, 1152, 648), false)
-	glow(Vector2(1035, 198), Vector2(187, 170), Color("#e997a62e"))
+	if ceiling_light_on:
+		glow(Vector2(1035, 132), Vector2(255, 219), Color("#ec91a349"))
 
 	# Woven rug under the console.
 	shape([Vector2(188, 483), Vector2(630, 483), Vector2(754, 600), Vector2(84, 600)], "#261c2b7f")
@@ -441,15 +499,19 @@ func draw_bedroom() -> void:
 		line(Vector2(204 - side, y), Vector2(616 + side, y), "#bd87902b")
 	glow(Vector2(414, 492), Vector2(305, 115), Color("#161323a5"))
 
+func draw_ceiling_light() -> void:
+	line(Vector2(1033, 0), Vector2(1033, 71), "#564150", 3)
+	if ceiling_light_on:
+		glow(Vector2(1033, 110), Vector2(113, 71), Color("#ffd2aa75"))
+	shape([Vector2(1003, 71), Vector2(1063, 71), Vector2(1091, 108),
+		Vector2(975, 108)], "#a66d67" if ceiling_light_on else "#493847")
+	shape([Vector2(1011, 73), Vector2(1055, 73), Vector2(1075, 106),
+		Vector2(988, 106)], "#c48c77" if ceiling_light_on else "#5a4451")
+	rounded(Rect2(975, 105, 116, 10), 5, "#f5bc92" if ceiling_light_on else "#43333e")
+	if CEILING_LIGHT.has_point(pointer):
+		line(Vector2(992, 108), Vector2(1075, 108), "#fff0d8" if ceiling_light_on else "#9d7b8b", 2)
+
 func draw_desk() -> void:
-	# A warm desk lamp lights the cartridge tray.
-	box(1032, 162, 8, 133, "#4c3246")
-	line(Vector2(1036, 165), Vector2(1036, 284), "#e2a780", 2)
-	rounded(Rect2(1000, 282, 67, 10), 5, "#614354", "#b78570")
-	shape([Vector2(1004, 125), Vector2(1069, 125), Vector2(1090, 169), Vector2(981, 169)], "#8c575c")
-	shape([Vector2(1010, 126), Vector2(1063, 126), Vector2(1078, 166), Vector2(992, 166)], "#bc7f6f")
-	glow(Vector2(1035, 171), Vector2(95, 49), Color("#ffd3a576"))
-	line(Vector2(984, 169), Vector2(1087, 169), "#fac297", 3)
 
 	rounded(Rect2(777, 482, 336, 100), 5, "#30212e")
 	gradient(Rect2(783, 514, 319, 64), "#8c5957", "#523545")
@@ -497,8 +559,9 @@ func draw_television() -> void:
 	else:
 		shape([Vector2(154, 97), Vector2(375, 97), Vector2(207, 286), Vector2(154, 299)], "#70a0c116")
 		line(Vector2(169, 109), Vector2(605, 109), "#b1aec331", 2)
-	for y in range(98, 456, 4):
-		line(Vector2(153, y), Vector2(633, y), "#090b1524")
+	if scanlines_enabled:
+		for y in range(98, 456, 4):
+			line(Vector2(153, y), Vector2(633, y), "#090b1524")
 	for x in range(660, 696, 5):
 		rounded(Rect2(x, 137, 2, 163), 1, "#30293a")
 	rounded(Rect2(660, 382, 34, 29), 6, "#3e3446", "#78677b")
@@ -600,6 +663,7 @@ func draw_console_button(rect: Rect2, label: String, color: String) -> void:
 
 func _draw() -> void:
 	draw_bedroom()
+	draw_ceiling_light()
 	draw_desk()
 	draw_television()
 	draw_console()

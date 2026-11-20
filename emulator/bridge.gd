@@ -2,6 +2,7 @@ extends Node
 
 signal failed(message: String)
 signal frame_changed
+signal state_result(message: String)
 
 var rgb565 := true
 
@@ -104,6 +105,12 @@ func reset() -> void:
 	if authenticated:
 		send_command(82, 0)
 
+func request_state(save: bool) -> void:
+	if running and authenticated and picture:
+		send_command(83 if save else 76, 0)
+	else:
+		state_result.emit("Insert a playable cartridge first.")
+
 func set_player_two(connected: bool) -> void:
 	player_two_connected = connected
 	sent_second_mask = -1
@@ -171,6 +178,16 @@ func read_frames() -> void:
 		if kind == 4:
 			core_stats = Vector4(width, height, rate, payload_size) / 1000.0
 			offset += HEADER_SIZE
+			continue
+		if kind == 5:
+			if payload_size > 4096:
+				report_error("Invalid save-state response.")
+				return
+			var message_end := offset + HEADER_SIZE + payload_size
+			if message_end > incoming.size():
+				break
+			state_result.emit(incoming.slice(offset + HEADER_SIZE, message_end).get_string_from_utf8())
+			offset = message_end
 			continue
 		if kind < 1 or kind > 3 or width > 1024 or height > 1024 or payload_size > 32768:
 			report_error("Invalid data from the emulator core.")

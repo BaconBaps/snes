@@ -2,6 +2,8 @@ shader_type canvas_item;
 render_mode unshaded;
 
 uniform bool rgb565 = true;
+uniform bool scanlines = true;
+uniform int preset = 0;
 
 void fragment() {
 	// Snes9x delivers a little-endian 16-bit pixel in the R and G bytes.
@@ -14,6 +16,15 @@ void fragment() {
 		float((pixel >> 5) & green_mask) / float(green_mask),
 		float(pixel & 31) / 31.0
 	);
-	float scanline = mod(floor(UV.y * 360.0), 4.0) == 0.0 ? 0.81 : 1.0;
+	if (preset == 1) {
+		vec2 edge = UV * 2.0 - 1.0;
+		rgb *= (1.0 - 0.16 * dot(edge, edge)) * vec3(1.0, 0.97, 0.92);
+	} else if (preset == 2) {
+		int phosphor = int(floor(UV.x * 480.0)) % 3;
+		vec3 mask = phosphor == 0 ? vec3(1.0, 0.78, 0.78) : (
+			phosphor == 1 ? vec3(0.78, 1.0, 0.78) : vec3(0.78, 0.78, 1.0));
+		rgb *= mask;
+	}
+	float scanline = scanlines && mod(floor(UV.y * 360.0), 4.0) == 0.0 ? 0.81 : 1.0;
 	COLOR = vec4(rgb * scanline, 1.0);
 }

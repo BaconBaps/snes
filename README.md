@@ -14,6 +14,12 @@ A Godot 4 Super Nintendo emulator frontend set in a 1990s bedroom. Insert a cart
 
 The sample cartridges show a graphical preview without Python or a core. The core binaries and ROMs are separate from the repository. See the [Snes9x license](https://github.com/libretro/snes9x/blob/master/LICENSE) and [bsnes-mercury source and license](https://github.com/libretro/bsnes-mercury).
 
+## Room and emulation settings
+
+Click the hanging light to dim the bedroom. The CRT image and its glow keep their brightness.
+
+**Settings → Emulation** contains the core selector, **Save state**, **Load state**, **Scanlines**, and the **Shader preset** picker. Save states capture the running game and use one slot per ROM and core. These files are separate from battery saves. The display controls take effect immediately.
+
 ## Controls
 
 | Action | Input |
