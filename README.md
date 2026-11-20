@@ -10,7 +10,7 @@ A Godot 4 Super Nintendo emulator frontend set in a 1990s bedroom. Insert a cart
    - [Snes9x](https://buildbot.libretro.com/nightly/windows/x86_64/latest/snes9x_libretro.dll.zip)
    - [bsnes-mercury Balanced](https://buildbot.libretro.com/nightly/windows/x86_64/latest/bsnes_mercury_balanced_libretro.dll.zip)
 4. In the Godot Project Manager, choose **Import**, select `project.godot`, and press **F5**.
-5. Click the **Settings** gear, then **Choose ROM folder** and select a folder containing your `.sfc` or `.smc` files. Choose the core in **Settings**, then drag a cartridge to the slot. To compare cores, eject the cartridge, choose the other core, and reinsert it.
+5. Click the **Settings** gear, then **Choose ROM folder** and select a folder containing your `.sfc` or `.smc` files. Choose the core in **Settings → Emulation**, then drag a cartridge to the slot. To compare cores, eject the cartridge, choose the other core, and reinsert it.
 
 The sample cartridges show a graphical preview without Python or a core. The core binaries and ROMs are separate from the repository. See the [Snes9x license](https://github.com/libretro/snes9x/blob/master/LICENSE) and [bsnes-mercury source and license](https://github.com/libretro/bsnes-mercury).
 

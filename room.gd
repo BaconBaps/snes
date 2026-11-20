@@ -51,9 +51,18 @@ var lift := 0.0:
 		queue_redraw()
 
 var crt := TextureRect.new()
+var screen_spill := ColorRect.new()
+var screen_light := Color.BLACK
 var diagnostics := Label.new()
 
 func _ready() -> void:
+	var spill_material := ShaderMaterial.new()
+	spill_material.shader = preload("res://emulator/crt_spill.gdshader")
+	screen_spill.material = spill_material
+	screen_spill.size = Vector2(793, 607)
+	screen_spill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	screen_spill.hide()
+	add_child(screen_spill)
 	var crt_material := ShaderMaterial.new()
 	crt_material.shader = preload("res://emulator/crt.gdshader")
 	crt.material = crt_material
@@ -105,13 +114,33 @@ func setup_settings() -> void:
 		picker.popup_centered_ratio(0.8))
 	menu.add_child(folder_button)
 
+	var emulation_page := VBoxContainer.new()
+	emulation_page.add_theme_constant_override("separation", 6)
+	settings.add_child(emulation_page)
+	emulation_page.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 12)
+	emulation_page.hide()
+
+	var emulation_button := Button.new()
+	emulation_button.text = "Emulation  ›"
+	emulation_button.pressed.connect(func():
+		menu.hide()
+		emulation_page.show())
+	menu.add_child(emulation_button)
+
+	var back := Button.new()
+	back.text = "‹  Settings"
+	back.pressed.connect(func():
+		emulation_page.hide()
+		menu.show())
+	emulation_page.add_child(back)
+
 	var core_label := Label.new()
 	core_label.text = "SNES core"
-	menu.add_child(core_label)
+	emulation_page.add_child(core_label)
 	core_picker.tooltip_text = "Emulation core for the next cartridge"
 	for name in emulator.CORE_NAMES:
 		core_picker.add_item(name)
-	menu.add_child(core_picker)
+	emulation_page.add_child(core_picker)
 
 	var layout_label := Label.new()
 	layout_label.text = "Cartridge view"
@@ -134,6 +163,8 @@ func setup_settings() -> void:
 	gear.pressed.connect(func():
 		hovered = -1
 		queue_redraw()
+		emulation_page.hide()
+		menu.show()
 		settings.popup_centered(Vector2i(264, 176)))
 	add_child(gear)
 
@@ -328,7 +359,14 @@ func show_emulator_error(error: String) -> void:
 	message = error
 	queue_redraw()
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	var target := emulator.screen_light
+	if powered and rom_paths.is_empty():
+		target = Color("#496185")
+	screen_light = screen_light.lerp(target, 1.0 - exp(-delta * 11.0))
+	screen_spill.visible = screen_light.get_luminance() > 0.005
+	if screen_spill.visible:
+		screen_spill.material.set_shader_parameter("light_color", Vector3(screen_light.r, screen_light.g, screen_light.b))
 	if diagnostics.visible:
 		var status: String = emulator.stats if emulator.running and not emulator.stats.is_empty() else "Insert a ROM to measure playback…"
 		if diagnostics.text != status:
@@ -391,48 +429,16 @@ func cartridge(index: int, at: Vector2, visible_height := CART_SIZE.y) -> void:
 		line(at + Vector2(12, 57), at + Vector2(CART_SIZE.x - 12, 57), "#bbb0b6")
 
 func draw_bedroom() -> void:
-	gradient(Rect2(0, 0, 1152, 405), "#292d49", "#796178")
-	for x in range(18, 1152, 31):
-		box(x, 0, 1, 405, "#d3a7b011")
-		box(x + 5, 0, 1, 405, "#291d381a")
-	glow(Vector2(923, 180), Vector2(320, 253), Color("#ec9c6c38"))
-	box(0, 400, 1152, 17, "#4b354d")
-	line(Vector2(0, 400), Vector2(1152, 400), "#a17881", 2)
-	gradient(Rect2(0, 417, 1152, 231), "#735052", "#392936")
-	for y in [437, 461, 491, 529, 576, 638]:
-		line(Vector2(0, y), Vector2(1152, y), "#281e2f89", 2)
-	for x in range(-250, 1500, 115):
-		line(Vector2(530 + (x - 530) * 0.54, 417), Vector2(x, 648), "#261b2e56")
-
-	# Moonlit window and curtains behind the television.
-	rounded(Rect2(18, 36, 186, 264), 5, "#322840")
-	gradient(Rect2(30, 47, 162, 239), "#1a2349", "#8c6788")
-	glow(Vector2(83, 103), Vector2(34, 35), Color("#dfd4ff77"))
-	draw_circle(Vector2(83, 103), 18, Color("#f5dfcf"), true, -1, true)
-	for star in [Vector2(55, 79), Vector2(104, 66), Vector2(123, 127), Vector2(56, 150), Vector2(156, 84)]:
-		draw_circle(star, 1.45, Color("#fbdfd3"), true, -1, true)
-	box(109, 47, 6, 239, "#6a526f")
-	box(30, 161, 162, 6, "#71556f")
-	shape([Vector2(13, 42), Vector2(55, 42), Vector2(44, 173), Vector2(58, 292),
-		Vector2(13, 302)], "#53405f")
-	line(Vector2(32, 47), Vector2(27, 290), "#8a6482", 2)
-	box(10, 288, 195, 7, "#795970")
-
-	# Bedspread at the edge of the room.
-	rounded(Rect2(-47, 340, 133, 88), 19, "#756482")
-	shape([Vector2(-12, 387), Vector2(66, 388), Vector2(109, 450), Vector2(87, 532),
-		Vector2(-12, 545)], "#666078")
-	shape([Vector2(-12, 387), Vector2(66, 388), Vector2(109, 450), Vector2(-12, 461)], "#93839b")
-	for x in range(0, 87, 13):
-		line(Vector2(x, 400 + x * 0.55), Vector2(x - 8, 525), "#bda3b132")
+	draw_texture_rect(preload("res://art/bedroom.jpg"), Rect2(0, 0, 1152, 648), false)
+	glow(Vector2(1035, 198), Vector2(187, 170), Color("#e997a62e"))
 
 	# Woven rug under the console.
 	shape([Vector2(188, 483), Vector2(630, 483), Vector2(754, 600), Vector2(84, 600)], "#261c2b7f")
-	shape([Vector2(192, 481), Vector2(626, 481), Vector2(733, 594), Vector2(96, 594)], "#684958")
-	shape([Vector2(205, 488), Vector2(615, 488), Vector2(706, 581), Vector2(123, 581)], "#8c5d6a")
+	shape([Vector2(192, 481), Vector2(626, 481), Vector2(733, 594), Vector2(96, 594)], "#443044")
+	shape([Vector2(205, 488), Vector2(615, 488), Vector2(706, 581), Vector2(123, 581)], "#614454")
 	for y in range(491, 581, 4):
 		var side := (y - 491) * 0.85
-		line(Vector2(204 - side, y), Vector2(616 + side, y), "#d4928f24")
+		line(Vector2(204 - side, y), Vector2(616 + side, y), "#bd87902b")
 	glow(Vector2(414, 492), Vector2(305, 115), Color("#161323a5"))
 
 func draw_desk() -> void:
@@ -449,9 +455,13 @@ func draw_desk() -> void:
 	gradient(Rect2(783, 514, 319, 64), "#8c5957", "#523545")
 	box(789, 562, 22, 41, "#593a46")
 	box(1079, 559, 20, 44, "#563741")
-	shape([Vector2(810, 292), Vector2(1099, 292), Vector2(1130, 539), Vector2(752, 539)], "#a77163")
-	shape([Vector2(819, 301), Vector2(1091, 301), Vector2(1115, 535), Vector2(769, 535)], "#74545b")
-	gradient(Rect2(785, 322, 311, 213), "#8b625f", "#6a4956")
+	shape([Vector2(810, 292), Vector2(1099, 292), Vector2(1130, 539), Vector2(752, 539)], "#84596a")
+	shape([Vector2(819, 301), Vector2(1091, 301), Vector2(1115, 535), Vector2(769, 535)], "#593e52")
+	gradient(Rect2(785, 322, 311, 213), "#765160", "#4e3648")
+	for index in range(27):
+		var y := 326 + index * 7
+		line(Vector2(788 + (index * 17) % 130, y),
+			Vector2(1093 - (index * 11) % 120, y + 1), "#d3a4b413")
 	for y in [316, 391, 464, 538]:
 		line(Vector2(784, y), Vector2(1105, y), "#442f42", 2)
 	box(752, 539, 378, 15, "#704754")
@@ -463,11 +473,13 @@ func draw_desk() -> void:
 func draw_television() -> void:
 	draw_set_transform(TV_OFFSET)
 	# The front stays square to the viewer. The top recedes symmetrically.
-	shape([Vector2(130, 85), Vector2(151, 62), Vector2(686, 62), Vector2(707, 85)], "#80727e")
-	line(Vector2(155, 64), Vector2(682, 64), "#a49197", 2)
+	shape([Vector2(130, 85), Vector2(151, 62), Vector2(686, 62), Vector2(707, 85)], "#574e64")
+	line(Vector2(155, 64), Vector2(682, 64), "#85748e", 2)
 	for x in range(536, 653, 7):
 		line(Vector2(x, 67), Vector2(x + 4, 73), "#514757")
-	rounded(Rect2(125, 75, 587, 414), 22, "#514859", "#a18a91")
+	rounded(Rect2(125, 75, 587, 414), 22, "#3d374b", "#776683")
+	gradient(Rect2(643, 106, 57, 351), "#54475d", "#30283a")
+	line(Vector2(700, 110), Vector2(700, 454), "#67546d")
 	rounded(Rect2(139, 84, 508, 387), 18, "#272432", "#6c5b6d")
 	rounded(Rect2(146, 90, 494, 374), 12, "#141623", "#181925")
 	draw_rect(TV_GLASS, Color("#171d2d"))
@@ -503,9 +515,9 @@ func draw_console() -> void:
 	rounded(Rect2(282, 579, 267, 21), 9, "#aea195")
 	shape([Vector2(277, 581), Vector2(281, 571), Vector2(308, 508), Vector2(316, 501),
 		Vector2(514, 501), Vector2(523, 508), Vector2(552, 572), Vector2(554, 581),
-		Vector2(545, 588), Vector2(287, 588)], "#d9cbb8")
+		Vector2(545, 588), Vector2(287, 588)], "#a196a7")
 	shape([Vector2(288, 579), Vector2(313, 508), Vector2(518, 508), Vector2(543, 579),
-		Vector2(536, 584), Vector2(294, 584)], "#e8ddcc")
+		Vector2(536, 584), Vector2(294, 584)], "#c1b6bc")
 	line(Vector2(294, 586), Vector2(538, 586), "#f7e4cf", 2)
 	line(Vector2(281, 592), Vector2(550, 592), "#7c7069")
 	shape([Vector2(320, 511), Vector2(510, 511), Vector2(530, 568), Vector2(524, 574),

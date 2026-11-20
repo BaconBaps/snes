@@ -17,6 +17,8 @@ const GAMEPAD := [JOY_BUTTON_A, JOY_BUTTON_X, JOY_BUTTON_BACK, JOY_BUTTON_START,
 	JOY_BUTTON_B, JOY_BUTTON_Y, JOY_BUTTON_LEFT_SHOULDER, JOY_BUTTON_RIGHT_SHOULDER]
 
 var picture: ImageTexture
+var screen_light := Color.BLACK
+var light_sample_at := 0
 var running := false
 
 var server := TCPServer.new()
@@ -89,6 +91,8 @@ func stop() -> void:
 	server.stop()
 	incoming.clear()
 	picture = null
+	screen_light = Color.BLACK
+	light_sample_at = 0
 	frame_changed.emit()
 	audio.stop()
 	playback = null
@@ -191,6 +195,10 @@ func read_frames() -> void:
 		offset = end
 	# Keep all audio, but upload only the newest complete video frame.
 	if latest_start >= 0:
+		var now := Time.get_ticks_msec()
+		if now >= light_sample_at:
+			sample_screen_light(latest_start, latest_width, latest_height, latest_rgb565)
+			light_sample_at = now + 33
 		var image := Image.create_from_data(latest_width, latest_height, false, Image.FORMAT_RG8,
 			incoming.slice(latest_start, latest_end))
 		if not picture or picture.get_width() != latest_width or picture.get_height() != latest_height:
@@ -202,6 +210,19 @@ func read_frames() -> void:
 		frame_changed.emit()
 	if offset > 0:
 		incoming = incoming.slice(offset)
+
+func sample_screen_light(start: int, width: int, height: int, is_rgb565: bool) -> void:
+	# Read a sparse set of pixels from the received frame, without a GPU readback.
+	var sum := Vector3.ZERO
+	var green_bits := 6 if is_rgb565 else 5
+	var green_mask := (1 << green_bits) - 1
+	for row in range(1, 8):
+		for column in range(1, 10):
+			var offset := start + (floori(row * height / 8.0) * width + floori(column * width / 10.0)) * 2
+			var pixel := incoming.decode_u16(offset)
+			sum += Vector3(float((pixel >> (green_bits + 5)) & 31) / 31.0,
+				float((pixel >> 5) & green_mask) / green_mask, float(pixel & 31) / 31.0)
+	screen_light = Color(sum.x / 63.0, sum.y / 63.0, sum.z / 63.0)
 
 func update_stats() -> void:
 	var now := Time.get_ticks_msec()
