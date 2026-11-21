@@ -157,6 +157,7 @@ var lift := 0.0:
 var crt := TextureRect.new()
 var crt_glass := ColorRect.new()
 var room_dimmer := ColorRect.new()
+var room_overlay := Node2D.new()
 var ceiling_light_on := true
 var television := Television.ORIGINAL
 var scanlines_enabled := false
@@ -174,7 +175,7 @@ func _ready() -> void:
 		add_child(player)
 	restore_preferences()
 	room_dimmer.color = Color("#0a0816ca")
-	room_dimmer.size = Vector2(1152, 607)
+	room_dimmer.size = Vector2(1152, 648)
 	room_dimmer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	room_dimmer.visible = not ceiling_light_on
 	add_child(room_dimmer)
@@ -206,6 +207,8 @@ func _ready() -> void:
 	crt_glass.size = SCREEN.size
 	crt_glass.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(crt_glass)
+	room_overlay.draw.connect(draw_room_overlay)
+	add_child(room_overlay)
 	update_glass_sheen()
 	add_child(emulator)
 	emulator.frame_changed.connect(update_crt)
@@ -1156,16 +1159,16 @@ func gradient(rect: Rect2, top: String, bottom: String) -> void:
 func shape(points: PackedVector2Array, color: String) -> void:
 	draw_colored_polygon(points, Color(color))
 
-func rounded(rect: Rect2, radius: int, fill: String, border: String = "") -> void:
+func rounded(rect: Rect2, radius: int, fill: String, border: String = "", canvas: CanvasItem = self) -> void:
 	var style := StyleBoxFlat.new()
 	style.set_corner_radius_all(radius)
 	style.bg_color = Color(fill)
 	if not border.is_empty():
 		style.border_color = Color(border)
 		style.set_border_width_all(1)
-	draw_style_box(style, rect)
+	canvas.draw_style_box(style, rect)
 
-func glow(center: Vector2, size: Vector2, tint: Color) -> void:
+func glow(center: Vector2, size: Vector2, tint: Color, canvas: CanvasItem = self) -> void:
 	var points := PackedVector2Array([center])
 	var colors := PackedColorArray([tint])
 	var edge := Color(tint, 0.0)
@@ -1175,7 +1178,7 @@ func glow(center: Vector2, size: Vector2, tint: Color) -> void:
 		colors.append(edge)
 	# Draw a triangle fan so the light fades smoothly to its perimeter.
 	for step in range(1, 65):
-		draw_polygon(PackedVector2Array([points[0], points[step], points[step + 1]]),
+		canvas.draw_polygon(PackedVector2Array([points[0], points[step], points[step + 1]]),
 			PackedColorArray([colors[0], colors[step], colors[step + 1]]))
 
 func line(from: Vector2, to: Vector2, color: String, width: float = 1.0) -> void:
@@ -1639,10 +1642,6 @@ func draw_console() -> void:
 	draw_console_button(RESET_ART, "RESET", "#817d90" if RESET.has_point(pointer) else "#626070")
 
 	draw_console_wordmark()
-	if powered:
-		glow(Vector2(499, 579), Vector2(20, 8), Color("#ff4d5568"))
-		rounded(Rect2(492, 577.8, 14, 3), 2, "#ff3d5c")
-		line(Vector2(495, 578.3), Vector2(503, 578.3), "#ffacaf")
 	draw_set_transform(Vector2.ZERO)
 
 func draw_megadrive_console() -> void:
@@ -1674,11 +1673,7 @@ func draw_megadrive_console() -> void:
 		line(Vector2(x, 554), Vector2(x, 557), "#afa6a4")
 	words("RESET", 323, 571, 7)
 	draw_string(ThemeDB.fallback_font, Vector2(422, 535), "16-BIT", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("#f2d394"))
-	var led := Vector2(447, 550)
-	draw_circle(led, 3.25, Color("#483b44"), true, -1, true)
-	if powered:
-		glow(led, Vector2(13, 9), Color("#fb435475"))
-		draw_circle(led, 2.3, Color("#fc4258"), true, -1, true)
+	draw_circle(Vector2(447, 550), 3.25, Color("#483b44"), true, -1, true)
 	words("MEGA DRIVE", 470, 575, 9)
 	for port in [MD_PORT_ONE, MD_PORT_TWO]:
 		rounded(port, 3, "#121017", "#514a59")
@@ -1766,6 +1761,22 @@ func _draw() -> void:
 	draw_shoebox_front()
 	if dragging >= 0 and not (megadrive and seated and dragging == inserted):
 		cartridge(dragging, dragged_cartridge_position(pointer))
-	gradient(Rect2(0, 607, 1152, 41), "#271d2cca", "#1d1726")
-	words(message, 32, 633, 16, 920)
-	words("F11  Fullscreen", 994, 633, 15)
+	room_overlay.queue_redraw()
+
+func draw_room_overlay() -> void:
+	var font := ThemeDB.fallback_font
+	var ink := Color("#f9e4c5")
+	room_overlay.draw_string(font, Vector2(32, 633), message, HORIZONTAL_ALIGNMENT_LEFT, 920, 16, ink)
+	room_overlay.draw_string(font, Vector2(994, 633), "F11  Fullscreen", HORIZONTAL_ALIGNMENT_LEFT, -1, 15, ink)
+	if not powered:
+		return
+	if megadrive:
+		var led := Vector2(447, 550)
+		glow(led, Vector2(13, 9), Color("#fb435475"), room_overlay)
+		room_overlay.draw_circle(led, 2.3, Color("#fc4258"), true, -1, true)
+	else:
+		room_overlay.draw_set_transform_matrix(CONSOLE_TRANSFORM)
+		glow(Vector2(499, 579), Vector2(20, 8), Color("#ff4d5568"), room_overlay)
+		rounded(Rect2(492, 577.8, 14, 3), 2, "#ff3d5c", "", room_overlay)
+		room_overlay.draw_line(Vector2(495, 578.3), Vector2(503, 578.3), Color("#ffacaf"), 1.0, true)
+		room_overlay.draw_set_transform(Vector2.ZERO)
