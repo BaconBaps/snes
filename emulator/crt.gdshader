@@ -21,10 +21,10 @@ void fragment() {
 		vec2 edge = UV * 2.0 - 1.0;
 		rgb *= (1.0 - 0.16 * dot(edge, edge)) * vec3(1.0, 0.97, 0.92);
 	} else if (preset == 2) {
-		int phosphor = int(floor(UV.x * 480.0)) % 3;
-		vec3 mask = phosphor == 0 ? vec3(1.0, 0.78, 0.78) : (
-			phosphor == 1 ? vec3(0.78, 1.0, 0.78) : vec3(0.78, 0.78, 1.0));
-		rgb *= mask;
+		// Overlap the phosphor stripes and keep their channel contrast subtle.
+		float phase = (UV.x * glass_size.x - 0.5) * (TAU / 3.0);
+		vec3 channels = phase - vec3(0.0, TAU / 3.0, TAU * 2.0 / 3.0);
+		rgb *= 0.95 + 0.05 * cos(channels);
 	}
 	float scanline = scanlines && mod(floor(UV.y * 360.0), 4.0) == 0.0 ? 0.81 : 1.0;
 	// Round and feather the aperture in room pixels.
