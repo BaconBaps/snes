@@ -58,6 +58,7 @@ const TRIGGER_RELEASE := 0.35
 const STACK_LIFT := -22.0
 const LABEL_COLORS := ["#367d80", "#a05261", "#646095", "#8b693c"]
 
+var notebook_button := Button.new()
 var notebook := preload("res://cartridge_notebook.gd").new()
 var shoebox_indices: Array[int] = []
 var notebook_selection := -1
@@ -161,11 +162,16 @@ func _ready() -> void:
 	add_child(notebook)
 	notebook.setup(self)
 	setup_cartridge_navigation()
-	var notebook_button := Button.new()
-	notebook_button.text = "▤  Notebook"
-	notebook_button.position = Vector2(867, 213)
-	notebook_button.theme = make_settings_theme()
+	notebook_button.name = "NotebookButton"
+	notebook_button.flat = true
 	notebook_button.focus_mode = Control.FOCUS_NONE
+	notebook_button.tooltip_text = "Open cartridge notebook"
+	notebook_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	notebook_button.position = notebook_position()
+	notebook_button.rotation = deg_to_rad(-9)
+	notebook_button.size = Vector2(99, 48)
+	notebook_button.mouse_entered.connect(queue_redraw)
+	notebook_button.mouse_exited.connect(queue_redraw)
 	notebook_button.pressed.connect(notebook.open_notebook)
 	add_child(notebook_button)
 	get_window().mouse_exited.connect(func(): hovered = -1)
@@ -586,6 +592,7 @@ func visible_cartridges() -> Array:
 func change_layout(index: int) -> void:
 	var first_visible := page * page_size()
 	stacked = index == 1
+	notebook_button.position = notebook_position()
 	save_preferences()
 	page = floori(first_visible / float(page_size()))
 	update_page_controls()
@@ -647,7 +654,7 @@ func console_cartridge_height() -> float:
 
 func setup_cartridge_navigation() -> void:
 	var controls := HBoxContainer.new()
-	controls.position = Vector2(783, 575)
+	controls.position = Vector2(783, 563)
 	controls.size = Vector2(331, 26)
 	controls.add_theme_constant_override("separation", 8)
 	previous_page_button.text = "‹"
@@ -1110,6 +1117,32 @@ func draw_shoebox() -> void:
 		line(Vector2(778 + (index * 13) % 79, y),
 			Vector2(1100 - (index * 17) % 75, y + 1), "#c0987e17")
 
+func notebook_position() -> Vector2:
+	return Vector2(784, 246 if stacked else 202)
+
+func draw_notebook() -> void:
+	# The front cartridge covers the lower part of the pad.
+	draw_set_transform(notebook_position(), notebook_button.rotation)
+	rounded(Rect2(4, 6, 101, 93), 4, "#24182875")
+	rounded(Rect2(-2, 1, 103, 94), 4, "#6f4b50", "#956a63")
+	rounded(Rect2(1, 3, 98, 91), 3, "#ad8c7a", "#e0b998")
+	rounded(Rect2(2, 1, 95, 89), 3, "#ddc5a6", "#f2d9bb")
+	gradient(Rect2(5, 8, 89, 74), "#ecd6b7" if notebook_button.is_hovered() else "#dfc8a8", "#c4a78f")
+	for y in range(24, 81, 8):
+		line(Vector2(7, y), Vector2(92, y), "#7d769352")
+	line(Vector2(17, 9), Vector2(17, 81), "#bb7b7666")
+	for x in range(9, 96, 9):
+		draw_circle(Vector2(x, 5), 1.6, Color("#584653"), true, -1, true)
+		draw_arc(Vector2(x, 2), 3.0, PI * 0.2, PI * 1.8, 12, Color("#795d59"), 1.4, true)
+	draw_string(ThemeDB.fallback_font, Vector2(22, 21), "Game notes",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#55415e"))
+	var notes := PackedVector2Array([Vector2(23, 29), Vector2(32, 28), Vector2(37, 30),
+		Vector2(47, 28), Vector2(55, 29), Vector2(70, 27)])
+	draw_polyline(notes, Color("#675173aa"), 1.1, true)
+	line(Vector2(23, 38), Vector2(76, 36), "#67517379")
+	line(Vector2(23, 45), Vector2(64, 44), "#67517369")
+	draw_set_transform(Vector2.ZERO)
+
 func draw_shoebox_front() -> void:
 	# Draw the front lip after the contents so it occludes their shadows.
 	shape([Vector2(753, 553), Vector2(1130, 553), Vector2(1122, 596),
@@ -1120,7 +1153,7 @@ func draw_shoebox_front() -> void:
 	line(Vector2(762, 595), Vector2(1121, 595), "#3a2935", 2)
 	for x in [770, 1112]:
 		line(Vector2(x, 562), Vector2(x, 592), "#68474b")
-	rounded(Rect2(919, 564, 48, 7), 4, "#50343e", "#a77565")
+	rounded(Rect2(775, 559, 340, 34), 5, "#4d354044", "#b2827256")
 
 func draw_tv_stand() -> void:
 	# The console sits in front of the stand, with the TV's feet on its top.
@@ -1331,6 +1364,7 @@ func _draw() -> void:
 	draw_bedroom()
 	draw_ceiling_light()
 	draw_shoebox()
+	draw_notebook()
 	draw_tv_stand()
 	draw_television()
 	draw_console()

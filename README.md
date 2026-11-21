@@ -18,7 +18,7 @@ The ROM folder and preferences are saved in Godot’s per-user data folder. They
 
 ## Cartridge notebook and shoeboxes
 
-Open **Notebook** beside the shoebox to search by name or filter for favourites, recently played games, and the active shoebox. Choose a result and click **Find in shoebox** to jump to and highlight its cartridge.
+Click the **Game notes** pad tucked behind the cartridges to search by name or filter for favourites, recently played games, and the active shoebox. Choose a result and click **Find in shoebox** to jump to and highlight its cartridge.
 
 To make a custom shoebox, enter a name and click **Create box**. Select a game in the notebook and choose **Add to box**. Use **Move earlier** or **Move later**, or drag a cartridge onto another cartridge in the shoebox to change its place. The notebook remembers favourites, recent games, custom boxes, and their order across launches. Select **All cartridges** to return to the complete ROM library.
 
@@ -47,7 +47,7 @@ Click the hanging light to dim the bedroom. The CRT image and its glow keep thei
 
 For local multiplayer, drag the loose gray plug from the floor into the console’s front-right port. The second gamepad Godot detects then controls Player 2. Pull the plug out and drop it away from the port to disconnect it. Player 1 keeps keyboard and first-gamepad input. You can plug in before or during a game.
 
-After ejecting, drag the cartridge back to the shoebox before inserting another. **Stack** is the default. Use **Settings → Cartridge view** to switch to **Grid**. In Stack view, hover over an exposed cartridge to lift it and reveal its full label, then drag it as usual. Use the mouse wheel or the arrows below the shoebox to turn pages. **A–Z** jumps to the page containing the first matching title. Saves are written to Godot's `user://saves` folder on eject or normal exit. Keep ROMs at the same paths so the prototype can match them to their saves.
+After ejecting, drag the cartridge back to the shoebox before inserting another. **Stack** is the default. Use **Settings → Cartridge view** to switch to **Grid**. In Stack view, hover over an exposed cartridge to lift it and reveal its full label, then drag it as usual. Use the mouse wheel or the arrows on the front of the shoebox to turn pages. **A–Z** jumps to the page containing the first matching title. Saves are written to Godot's `user://saves` folder on eject or normal exit. Keep ROMs at the same paths so the prototype can match them to their saves.
 
 On Linux x86-64, put the [Linux Snes9x core](https://buildbot.libretro.com/nightly/linux/x86_64/latest/snes9x_libretro.so.zip) or the [Linux bsnes-mercury Balanced core](https://buildbot.libretro.com/nightly/linux/x86_64/latest/bsnes_mercury_balanced_libretro.so.zip) in the same folder and use `python3`. Set `BEDROOM_ARCADE_PYTHON` to a Python executable path to override the default.
 
