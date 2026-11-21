@@ -38,7 +38,7 @@ def build(godot, core_dir, output):
             "pypdfium2==5.13.0", "Pillow==13.0.0",
         ], check=True)
 
-        for script in ("emulator/host.py", "manuals/render_page.py"):
+        for script in ("emulator/host.py", "manuals/render_page.py", "screenscraper/fetch_media.py"):
             destination = portable / script
             destination.parent.mkdir(exist_ok=True)
             shutil.copy2(PROJECT / script, destination)

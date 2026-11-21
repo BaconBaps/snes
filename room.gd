@@ -1,5 +1,7 @@
 extends Node2D
 
+const LocalRuntime := preload("res://local_runtime.gd")
+
 const CONSOLE_FLOOR := 607.0
 const CONSOLE_HEIGHT_SCALE := 1.75
 const CONSOLE_TRANSFORM := Transform2D(Vector2.RIGHT, Vector2(0, CONSOLE_HEIGHT_SCALE),
@@ -132,6 +134,7 @@ var lift := 0.0:
 		queue_redraw()
 
 var crt := TextureRect.new()
+var crt_glass := ColorRect.new()
 var room_dimmer := ColorRect.new()
 var ceiling_light_on := true
 var television := Television.ORIGINAL
@@ -174,6 +177,15 @@ func _ready() -> void:
 	crt.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	crt.hide()
 	add_child(crt)
+	var glass_material := ShaderMaterial.new()
+	glass_material.shader = preload("res://emulator/crt_glass.gdshader")
+	glass_material.set_shader_parameter("glass_size", SCREEN.size)
+	crt_glass.material = glass_material
+	crt_glass.position = SCREEN.position
+	crt_glass.size = SCREEN.size
+	crt_glass.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(crt_glass)
+	update_glass_sheen()
 	add_child(emulator)
 	emulator.frame_changed.connect(update_crt)
 	emulator.failed.connect(show_emulator_error)
@@ -404,7 +416,17 @@ func setup_settings() -> void:
 		picker.popup_centered_ratio(0.8))
 	menu.add_child(art_button)
 	menu.move_child(art_button, folder_button.get_index() + 1)
-	for button in [folder_button, art_button, emulation_button]:
+	var scraper := preload("res://screenscraper/scraper_dialog.gd").new()
+	add_child(scraper)
+	scraper.setup(self)
+	var scrape_button := Button.new()
+	scrape_button.text = "Download art and manuals  ›"
+	scrape_button.pressed.connect(func():
+		settings.hide()
+		scraper.open())
+	menu.add_child(scrape_button)
+	menu.move_child(scrape_button, art_button.get_index() + 1)
+	for button in [folder_button, art_button, scrape_button, emulation_button]:
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 
 	var tv_label := Label.new()
@@ -486,8 +508,15 @@ func update_crt() -> void:
 			notebook.record_played(rom_paths[inserted])
 		crt.texture = emulator.picture
 		crt.visible = crt.texture != null
+		update_glass_sheen()
 	if crt.material.get_shader_parameter("rgb565") != emulator.rgb565:
 		crt.material.set_shader_parameter("rgb565", emulator.rgb565)
+
+func update_glass_sheen() -> void:
+	var strength := 0.43 if crt.visible else 1.0
+	if not ceiling_light_on and not crt.visible:
+		strength *= 0.22
+	crt_glass.material.set_shader_parameter("sheen_strength", strength)
 
 func load_folder(path: String) -> void:
 	var folder := DirAccess.open(path)
@@ -553,7 +582,7 @@ func cartridge_label_texture(index: int) -> Texture2D:
 	if not label_textures.has(title):
 		var image := Image.new()
 		var texture: Texture2D
-		for path in [art_paths.get(title, ""), sidecar_paths.get(title, "")]:
+		for path in [art_paths.get(title, ""), sidecar_paths.get(title, ""), LocalRuntime.scraped_label(rom_paths[index])]:
 			if path.is_empty():
 				continue
 			if image.load(path) == OK and not image.is_empty():
@@ -867,6 +896,7 @@ func press_at(point: Vector2) -> void:
 	if CEILING_LIGHT.has_point(point) and dragging < 0:
 		ceiling_light_on = not ceiling_light_on
 		room_dimmer.visible = not ceiling_light_on
+		update_glass_sheen()
 		save_preferences()
 		queue_redraw()
 		return
@@ -1397,9 +1427,6 @@ func draw_television() -> void:
 			Vector2(633, 456), Vector2(153, 456)], "#24313f")
 		words("CRT PREVIEW", 174, 126, 14)
 		words(titles[inserted], 174, 425, 27, 425)
-	else:
-		shape([Vector2(154, 97), Vector2(375, 97), Vector2(207, 286), Vector2(154, 299)], "#70a0c116")
-		line(Vector2(169, 109), Vector2(605, 109), "#b1aec331", 2)
 	if scanlines_enabled:
 		for y in range(98, 456, 4):
 			line(Vector2(153, y), Vector2(633, y), "#090b1524")

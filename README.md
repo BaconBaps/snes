@@ -38,13 +38,19 @@ To make a custom shoebox, enter a name and click **Create box**. Select a game i
 
 The portable Windows ZIP includes PDF support. If you run the Godot source project directly, install the optional PDF renderer with `python -m pip install pypdfium2 Pillow` (use `python3` on Linux). Name the PDF like the ROM, for example `Super Mario Kart (Europe).pdf` for `Super Mario Kart (Europe).sfc`. Put it beside the ROM or in a `manuals` subfolder inside the ROM folder.
 
-When you insert a matching cartridge, its first PDF page fades onto the booklet behind the right-hand stack. Click the booklet to read over the shoebox. The cover opens on the right, followed by facing pages and a final page alone on the left. The controls are centred below the spread. Use **Previous**, **Next**, and **2×** zoom to read small text. The emulator keeps running while the manual is open.
+When you insert a matching cartridge, its first PDF page fades onto the booklet behind the right-hand stack. Click the booklet to read over the shoebox. The cover opens on the right, followed by facing pages and a final page alone on the left. The controls are centred below the spread. Click the right or left side of the spread to turn forward or back. The **Previous** and **Next** buttons work too. Use **2×** zoom to read small text. The emulator keeps running while the manual is open.
 
 ## Cartridge artwork
 
 Put a cropped label image next to its ROM or choose a separate directory under **Settings → Choose cartridge art folder**. Use the same filename before the extension, including any region tags. For example, pair `Super Mario Kart (Europe).sfc` with `Super Mario Kart (Europe).png`. PNG, JPG, and JPEG are supported. The separate artwork folder takes priority when both locations have a match. Games without matching artwork keep their generated labels.
 
 Artwork stretches to fill the rounded label area. Crop it to roughly 3.7:1 beforehand if you want to preserve its original proportions.
+
+## ScreenScraper downloads
+
+Open **Settings → Download art and manuals**, enter your [ScreenScraper](https://www.screenscraper.fr/) account credentials and your developer API credentials, then choose **Download missing media**. ScreenScraper requires a developer ID and password for API access. See the [ScreenScraper API documentation](https://www.screenscraper.fr/webapi2.php) for details. The app keeps credentials only for the current session.
+
+The app matches the games in the selected ROM folder using filenames and checksums. It downloads available cartridge artwork and PDF manuals into the app's data folder. Local artwork and manuals take priority. Downloads already saved are reused on future launches. If ScreenScraper pauses the run because of your account quota, you can run it again once the quota resets.
 
 ## Room and emulation settings
 

@@ -13,3 +13,14 @@ static func python_executable() -> String:
 		var bundled := app_path("runtime/python.exe")
 		return bundled if FileAccess.file_exists(bundled) else "python"
 	return "python3"
+
+static func media_directory(rom: String) -> String:
+	return ProjectSettings.globalize_path("user://screenscraper").path_join(rom.sha256_text())
+
+static func scraped_label(rom: String) -> String:
+	var directory := media_directory(rom)
+	for extension in ["png", "jpg", "webp"]:
+		var path := directory.path_join("label." + extension)
+		if FileAccess.file_exists(path):
+			return path
+	return ""

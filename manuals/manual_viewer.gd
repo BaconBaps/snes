@@ -43,7 +43,8 @@ func setup(room: Node2D) -> void:
 	paper.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	paper.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	paper.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	paper.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	paper.mouse_filter = Control.MOUSE_FILTER_PASS
+	paper.gui_input.connect(turn_at_page)
 	page_scroll.add_child(paper)
 
 	status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -73,6 +74,24 @@ func setup(room: Node2D) -> void:
 	hide()
 	set_process(false)
 
+func turn_at_page(event: InputEvent) -> void:
+	if not event is InputEventMouseButton or event.button_index != MOUSE_BUTTON_LEFT or not event.pressed:
+		return
+	accept_event()
+	if not paper.texture or process_id > 0 or page_turn:
+		return
+	var image_size := paper.texture.get_size()
+	var fit := minf(paper.size.x / image_size.x, paper.size.y / image_size.y)
+	var displayed_size := image_size * fit
+	var spread := Rect2((paper.size - displayed_size) * 0.5, displayed_size)
+	if not spread.has_point(event.position):
+		return
+	if event.position.x < spread.get_center().x:
+		if not previous.disabled:
+			request_page(previous_spread())
+	elif not next.disabled:
+		request_page(last_page_on_spread + 1)
+
 func set_rom(rom: String) -> void:
 	stop_render()
 	finish_turn()
@@ -98,7 +117,8 @@ func find_manual(rom: String) -> String:
 		for file in DirAccess.get_files_at(location):
 			if file.get_extension().to_lower() == "pdf" and file.get_basename().to_lower() == stem:
 				return location.path_join(file)
-	return ""
+	var cached := LocalRuntime.media_directory(rom).path_join("manual.pdf")
+	return cached if FileAccess.file_exists(cached) else ""
 
 func open_manual() -> void:
 	if not document_path.is_empty():
