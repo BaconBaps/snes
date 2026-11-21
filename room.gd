@@ -71,6 +71,8 @@ const LABEL_COLORS := ["#367d80", "#a05261", "#646095", "#8b693c"]
 var poster_picker := FileDialog.new()
 var poster_images: Array[Texture2D] = []
 var editing_poster := -1
+var manual := preload("res://manuals/manual_viewer.gd").new()
+var manual_button := Button.new()
 var notebook_button := Button.new()
 var notebook := preload("res://cartridge_notebook.gd").new()
 var shoebox_indices: Array[int] = []
@@ -188,6 +190,7 @@ func _ready() -> void:
 	notebook_button.mouse_exited.connect(queue_redraw)
 	notebook_button.pressed.connect(notebook.open_notebook)
 	add_child(notebook_button)
+	setup_manual()
 	get_window().mouse_exited.connect(func(): hovered = -1)
 	# Godot's built-in UI actions otherwise also react to SNES gameplay buttons.
 	for action in InputMap.get_actions():
@@ -491,6 +494,7 @@ func load_folder(path: String) -> void:
 		rom_folder = path
 		save_preferences()
 	emulator.stop()
+	manual.set_rom("")
 	titles.clear()
 	rom_paths.clear()
 	var files := Array(folder.get_files())
@@ -607,6 +611,7 @@ func change_layout(index: int) -> void:
 	var first_visible := page * page_size()
 	stacked = index == 1
 	notebook_button.position = notebook_position()
+	manual_button.position = manual_position()
 	save_preferences()
 	page = floori(first_visible / float(page_size()))
 	update_page_controls()
@@ -877,6 +882,7 @@ func press_at(point: Vector2) -> void:
 	elif EJECT.has_point(point) and seated:
 		last_eject = play_cartridge_sound(eject_sound, EJECT_SOUNDS, last_eject)
 		emulator.stop()
+		manual.set_rom("")
 		powered = false
 		seated = false
 		eject_animation = create_tween()
@@ -928,6 +934,8 @@ func drop_at(point: Vector2) -> void:
 		seated = true
 		reset_lift()
 		last_insert = play_cartridge_sound(insert_sound, INSERT_SOUNDS, last_insert)
+		if inserted < rom_paths.size():
+			manual.set_rom(rom_paths[inserted])
 		start_cartridge()
 	elif dragging == inserted and DESK.has_point(point):
 		inserted = -1
@@ -1232,6 +1240,44 @@ func draw_notebook() -> void:
 	line(Vector2(23, 45), Vector2(64, 44), "#67517369")
 	draw_set_transform(Vector2.ZERO)
 
+func setup_manual() -> void:
+	manual_button.name = "InstructionManual"
+	manual_button.flat = true
+	manual_button.focus_mode = Control.FOCUS_NONE
+	manual_button.tooltip_text = "Open instruction manual"
+	manual_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	manual_button.position = manual_position()
+	manual_button.rotation = deg_to_rad(7)
+	manual_button.size = Vector2(84, 45)
+	manual_button.pressed.connect(manual.open_manual)
+	manual_button.mouse_entered.connect(queue_redraw)
+	manual_button.mouse_exited.connect(queue_redraw)
+	manual_button.hide()
+	add_child(manual_button)
+	add_child(manual)
+	manual.setup(self)
+	manual.cover_changed.connect(func():
+		manual_button.visible = not manual.document_path.is_empty()
+		queue_redraw())
+
+func manual_position() -> Vector2:
+	return Vector2(967, 238 if stacked else 192)
+
+func draw_manual() -> void:
+	if manual.document_path.is_empty():
+		return
+	draw_set_transform(manual_position(), manual_button.rotation)
+	rounded(Rect2(4, 4, 86, 103), 3, "#21172798")
+	rounded(Rect2(2, 2, 85, 102), 2, "#bb9d8a", "#846b74")
+	rounded(Rect2(0, 0, 84, 99), 2, "#dacebd" if manual_button.is_hovered() else "#bba99e", "#d7bfaa")
+	if manual.cover:
+		draw_texture_rect(manual.cover, Rect2(3, 3, 78, 93), false)
+	else:
+		draw_string(ThemeDB.fallback_font, Vector2(6, 22), "Instructions",
+			HORIZONTAL_ALIGNMENT_CENTER, 72, 12, Color("#48384d"))
+	line(Vector2(2, 4), Vector2(2, 97), "#68505c", 1)
+	draw_set_transform(Vector2.ZERO)
+
 func draw_shoebox_front() -> void:
 	# Draw the front lip after the contents so it occludes their shadows.
 	shape([Vector2(753, 553), Vector2(1130, 553), Vector2(1122, 596),
@@ -1454,6 +1500,7 @@ func _draw() -> void:
 	draw_ceiling_light()
 	draw_shoebox()
 	draw_notebook()
+	draw_manual()
 	draw_tv_stand()
 	draw_television()
 	draw_console()

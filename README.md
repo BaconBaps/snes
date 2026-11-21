@@ -22,6 +22,12 @@ Click the **Game notes** pad tucked behind the cartridges to search by name or f
 
 To make a custom shoebox, enter a name and click **Create box**. Select a game in the notebook and choose **Add to box**. Use **Move earlier** or **Move later**, or drag a cartridge onto another cartridge in the shoebox to change its place. The notebook remembers favourites, recent games, custom boxes, and their order across launches. Select **All cartridges** to return to the complete ROM library.
 
+## Instruction manuals
+
+Install the optional PDF renderer with `python -m pip install pypdfium2 Pillow` (use `python3` on Linux). Name the PDF like the ROM, for example `Super Mario Kart (Europe).pdf` for `Super Mario Kart (Europe).sfc`. Put it beside the ROM or in a `manuals` subfolder inside the ROM folder.
+
+When you insert a matching cartridge, its first PDF page becomes the cover of the booklet behind the right-hand stack. Click the booklet to read it over the shoebox. Use **Previous**, **Next**, and **2×** zoom to read small text. The emulator keeps running while the manual is open.
+
 ## Cartridge artwork
 
 Put a cropped label image next to its ROM or choose a separate directory under **Settings → Choose cartridge art folder**. Use the same filename before the extension, including any region tags. For example, pair `Super Mario Kart (Europe).sfc` with `Super Mario Kart (Europe).png`. PNG, JPG, and JPEG are supported. The separate artwork folder takes priority when both locations have a match. Games without matching artwork keep their generated labels.
