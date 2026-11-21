@@ -17,7 +17,7 @@ const PLAYER_ONE_SOCKET := CONSOLE_TRANSFORM * Rect2(355, 591, 35, 8)
 const PLAYER_TWO_SOCKET := CONSOLE_TRANSFORM * Rect2(440, 591, 35, 8)
 const PLUG_SIZE := Vector2(41, 22)
 const LOOSE_PLUG := Vector2(611, 556)
-const LOOSE_CABLE_END := Vector2(729, 601)
+const SECOND_CABLE_EXIT_X := 729.0
 const DESK := Rect2(770, 252, 354, 308)
 const CEILING_LIGHT := Rect2(970, 60, 126, 62)
 enum Television { ORIGINAL, GRAPHITE, SILVER }
@@ -239,6 +239,7 @@ func _ready() -> void:
 	notebook_button.pressed.connect(notebook.open_notebook)
 	add_child(notebook_button)
 	setup_manual()
+	get_viewport().size_changed.connect(queue_redraw)
 	get_window().mouse_exited.connect(func(): hovered = -1)
 	get_window().focus_exited.connect(release_game_mouse)
 	# Godot's built-in UI actions otherwise also react to SNES gameplay buttons.
@@ -1583,8 +1584,6 @@ func draw_manual() -> void:
 	rounded(Rect2(0, 0, 84, 99), 2, "#dacebd" if manual_button.is_hovered() else "#bba99e", "#d7bfaa")
 	rounded(Rect2(3, 3, 78, 93), 2, "#675975")
 	box(3, 12, 78, 22, "#a28ca3")
-	draw_string(ThemeDB.fallback_font, Vector2(6, 27), "Instructions",
-		HORIZONTAL_ALIGNMENT_CENTER, 72, 11, Color("#332638"))
 	for y in [43, 51, 59]:
 		line(Vector2(16, y), Vector2(67, y), "#cdb2b767")
 	if manual.cover:
@@ -1811,15 +1810,16 @@ func draw_controller_plugs() -> void:
 	var second := player_two_plug_position()
 	if dragging_plug and plug_over_socket(pointer):
 		rounded(player_two_socket().grow(4), 5, "#a47b62", "#ffd7aa")
-	draw_controller_plug(first, Vector2(438 if megadrive else 379, 608))
-	draw_controller_plug(second, LOOSE_CABLE_END)
+	var cable_exit_y := get_viewport_rect().end.y + 6.0
+	draw_controller_plug(first, Vector2(438 if megadrive else 379, cable_exit_y))
+	draw_controller_plug(second, Vector2(SECOND_CABLE_EXIT_X, cable_exit_y))
 
 func draw_controller_plug(at: Vector2, cable_end: Vector2) -> void:
 	var start := at + Vector2(PLUG_SIZE.x / 2.0, PLUG_SIZE.y - 1.0)
 	var points := PackedVector2Array()
-	for index in range(17):
+	for index in range(33):
 		points.append(start.bezier_interpolate(start + Vector2(0, 31),
-			cable_end - Vector2(35, 9), cable_end, index / 16.0))
+			cable_end - Vector2(0, 24), cable_end, index / 32.0))
 	draw_polyline(points, Color("#292633"), 5.0, true)
 	draw_polyline(points, Color("#746e7a"), 2.0, true)
 	rounded(Rect2(at + Vector2(2, 3), PLUG_SIZE), 4, "#29263388")
@@ -1841,7 +1841,7 @@ func draw_console_button(rect: Rect2, label: String, color: String) -> void:
 	draw_console_caption(label, Vector2(rect.position.x, center.y + 6.5), rect.size.x, 8, "#f9f1eb")
 
 func draw_console_caption(label: String, baseline: Vector2, width: float, size: int, ink: String) -> void:
-	var caption_transform := Transform2D(0.0, Vector2(1, 0.68), 0.0, baseline)
+	var caption_transform := Transform2D(0.0, Vector2(1, 0.51), 0.0, baseline)
 	draw_set_transform_matrix(CONSOLE_TRANSFORM * caption_transform)
 	draw_string(ThemeDB.fallback_font, Vector2.ZERO, label, HORIZONTAL_ALIGNMENT_CENTER, width, size, Color(ink))
 	draw_set_transform_matrix(CONSOLE_TRANSFORM)
