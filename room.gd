@@ -18,6 +18,8 @@ const LOOSE_PLUG := Vector2(611, 556)
 const LOOSE_CABLE_END := Vector2(729, 601)
 const DESK := Rect2(770, 301, 354, 259)
 const CEILING_LIGHT := Rect2(970, 60, 126, 62)
+enum Television { ORIGINAL, GRAPHITE, SILVER }
+
 const TV_OFFSET := Vector2(0, -55)
 const TV_GLASS := Rect2(153, 96, 480, 360)
 const SCREEN := Rect2(TV_GLASS.position + TV_OFFSET, TV_GLASS.size)
@@ -108,6 +110,7 @@ var lift := 0.0:
 var crt := TextureRect.new()
 var room_dimmer := ColorRect.new()
 var ceiling_light_on := true
+var television := Television.ORIGINAL
 var scanlines_enabled := false
 var screen_spill := ColorRect.new()
 var screen_light := Color.BLACK
@@ -199,6 +202,7 @@ func restore_preferences() -> void:
 	art_folder = str(config.get_value("library", "art_folder", ""))
 	stacked = bool(config.get_value("library", "stacked", true))
 	ceiling_light_on = bool(config.get_value("room", "ceiling_light", true))
+	television = clampi(int(config.get_value("room", "television", Television.ORIGINAL)), Television.ORIGINAL, Television.SILVER) as Television
 	preferred_core = clampi(int(config.get_value("emulation", "core", 0)), 0, emulator.CORE_NAMES.size() - 1)
 	shader_preset = clampi(int(config.get_value("emulation", "shader_preset", 1)), 0, 2)
 	scanlines_enabled = bool(config.get_value("emulation", "scanlines", false))
@@ -209,6 +213,7 @@ func save_preferences() -> void:
 	config.set_value("library", "art_folder", art_folder)
 	config.set_value("library", "stacked", stacked)
 	config.set_value("room", "ceiling_light", ceiling_light_on)
+	config.set_value("room", "television", television)
 	config.set_value("emulation", "core", preferred_core)
 	config.set_value("emulation", "shader_preset", shader_preset)
 	config.set_value("emulation", "scanlines", scanlines_enabled)
@@ -316,7 +321,7 @@ func setup_settings() -> void:
 	back.pressed.connect(func():
 		emulation_page.hide()
 		menu.show()
-		settings.popup_centered(Vector2i(344, 288)))
+		settings.popup_centered(Vector2i(344, 358)))
 	emulation_page.add_child(back)
 	add_settings_heading(emulation_page, "Emulation")
 
@@ -354,9 +359,24 @@ func setup_settings() -> void:
 		picker.popup_centered_ratio(0.8))
 	menu.add_child(art_button)
 	menu.move_child(art_button, folder_button.get_index() + 1)
-	menu.move_child(emulation_button, menu.get_child_count() - 1)
 	for button in [folder_button, art_button, emulation_button]:
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+
+	var tv_label := Label.new()
+	tv_label.text = "CRT television"
+	menu.add_child(tv_label)
+	var tv_picker := OptionButton.new()
+	tv_picker.name = "TelevisionPicker"
+	tv_picker.add_item("Original", Television.ORIGINAL)
+	tv_picker.add_item("Graphite", Television.GRAPHITE)
+	tv_picker.add_item("Silver", Television.SILVER)
+	tv_picker.select(int(television))
+	tv_picker.item_selected.connect(func(index: int):
+		television = tv_picker.get_item_id(index) as Television
+		save_preferences()
+		queue_redraw())
+	menu.add_child(tv_picker)
+	menu.move_child(emulation_button, menu.get_child_count() - 1)
 
 	var gear := Button.new()
 	gear.name = "SettingsButton"
@@ -371,7 +391,7 @@ func setup_settings() -> void:
 		queue_redraw()
 		emulation_page.hide()
 		menu.show()
-		settings.popup_centered(Vector2i(344, 288)))
+		settings.popup_centered(Vector2i(344, 358)))
 	add_child(gear)
 
 func add_emulation_controls(page_controls: VBoxContainer) -> void:
@@ -1045,21 +1065,68 @@ func draw_tv_stand() -> void:
 		Vector2(718, 443)], "#5f4556")
 	gradient(Rect2(121, 443, 597, 12), "#836274", "#463242")
 	line(Vector2(125, 443), Vector2(714, 443), "#ab80915c")
-	for x in [170, 646]:
+	var right_foot := 606 if television == Television.SILVER else 646
+	for x in [170, right_foot]:
 		rounded(Rect2(x, 434, 25, 7), 2, "#24202c")
+
+func draw_graphite_cabinet() -> void:
+	shape([Vector2(125, 89), Vector2(150, 64), Vector2(681, 64), Vector2(711, 89)], "#3c3a4b")
+	line(Vector2(154, 66), Vector2(677, 66), "#726e83", 2)
+	rounded(Rect2(121, 80, 594, 409), 12, "#292833", "#676273")
+	gradient(Rect2(131, 89, 574, 387), "#393844", "#24232e")
+	line(Vector2(135, 88), Vector2(700, 88), "#888191")
+	rounded(Rect2(136, 85, 513, 386), 16, "#15151d", "#5b5665")
+	rounded(TV_GLASS.grow(7), 18, "#10121b", "#373643")
+
+	# The graphite cabinet has horizontal speaker slats running up its right side.
+	rounded(Rect2(655, 103, 48, 236), 3, "#17171f", "#5b5667")
+	for y in range(108, 335, 6):
+		line(Vector2(658, y), Vector2(700, y), "#60606f")
+		line(Vector2(658, y + 1), Vector2(700, y + 1), "#24232c", 2)
+	rounded(Rect2(655, 341, 48, 131), 4, "#2e2b39", "#4f485b")
+	for y in [354, 376, 398, 434]:
+		rounded(Rect2(664, y, 28, 9), 4, "#171720", "#645c6e")
+		line(Vector2(669, y + 1), Vector2(686, y + 1), "#878093")
+	draw_circle(Vector2(695, 452), 2.5, Color("#9fd0bc") if powered else Color("#57444e"))
+	rounded(Rect2(147, 484, 547, 9), 3, "#211d29")
+
+func draw_silver_cabinet() -> void:
+	shape([Vector2(133, 88), Vector2(155, 62), Vector2(632, 62), Vector2(654, 88)], "#827f91")
+	line(Vector2(158, 64), Vector2(629, 64), "#c0b8cc", 2)
+	rounded(Rect2(126, 78, 535, 412), 19, "#888392", "#beb5c5")
+	gradient(Rect2(136, 85, 515, 396), "#a5a0ac", "#706777")
+	rounded(Rect2(139, 84, 508, 385), 17, "#514d5b", "#cfbec9")
+	rounded(TV_GLASS.grow(7), 17, "#181a23", "#807682")
+
+	# A full-width speaker bank sits below the tube with inset controls in the centre.
+	rounded(Rect2(138, 467, 511, 19), 4, "#4b4355", "#a79aad")
+	for y in range(470, 485, 3):
+		line(Vector2(144, y), Vector2(644, y), "#262433")
+		line(Vector2(144, y + 1), Vector2(644, y + 1), "#8d8191")
+	rounded(Rect2(319, 468, 148, 17), 3, "#6f6378", "#9f8da3")
+	for x in range(337, 450, 23):
+		rounded(Rect2(x, 472, 15, 7), 3, "#8d8195", "#484250")
+	draw_circle(Vector2(460, 481), 2.0, Color("#9fd0bc") if powered else Color("#634d62"))
+	rounded(Rect2(154, 486, 478, 7), 3, "#3c3445")
 
 func draw_television() -> void:
 	draw_set_transform(TV_OFFSET)
-	# The front stays square to the viewer. The top recedes symmetrically.
-	shape([Vector2(130, 85), Vector2(151, 62), Vector2(686, 62), Vector2(707, 85)], "#574e64")
-	line(Vector2(155, 64), Vector2(682, 64), "#85748e", 2)
-	for x in range(536, 653, 7):
-		line(Vector2(x, 67), Vector2(x + 4, 73), "#514757")
-	rounded(Rect2(125, 75, 587, 414), 22, "#3d374b", "#776683")
-	gradient(Rect2(643, 106, 57, 351), "#54475d", "#30283a")
-	line(Vector2(700, 110), Vector2(700, 454), "#67546d")
-	rounded(Rect2(139, 84, 508, 387), 18, "#272432", "#6c5b6d")
-	rounded(Rect2(146, 90, 494, 374), 12, "#141623", "#181925")
+	match television:
+		Television.GRAPHITE:
+			draw_graphite_cabinet()
+		Television.SILVER:
+			draw_silver_cabinet()
+		_:
+			# The front stays square to the viewer. The top recedes symmetrically.
+			shape([Vector2(130, 85), Vector2(151, 62), Vector2(686, 62), Vector2(707, 85)], "#574e64")
+			line(Vector2(155, 64), Vector2(682, 64), "#85748e", 2)
+			for x in range(536, 653, 7):
+				line(Vector2(x, 67), Vector2(x + 4, 73), "#514757")
+			rounded(Rect2(125, 75, 587, 414), 22, "#3d374b", "#776683")
+			gradient(Rect2(643, 106, 57, 351), "#54475d", "#30283a")
+			line(Vector2(700, 110), Vector2(700, 454), "#67546d")
+			rounded(Rect2(139, 84, 508, 387), 18, "#272432", "#6c5b6d")
+			rounded(Rect2(146, 90, 494, 374), 12, "#141623", "#181925")
 	rounded(TV_GLASS, 16, "#171d2d")
 	if powered and rom_paths.is_empty():
 		gradient(TV_GLASS, "#25344e", "#5b4466")
@@ -1078,12 +1145,13 @@ func draw_television() -> void:
 	if scanlines_enabled:
 		for y in range(98, 456, 4):
 			line(Vector2(153, y), Vector2(633, y), "#090b1524")
-	for x in range(660, 696, 5):
-		rounded(Rect2(x, 137, 2, 163), 1, "#30293a")
-	rounded(Rect2(660, 382, 34, 29), 6, "#3e3446", "#78677b")
-	draw_circle(Vector2(677, 396), 7, Color("#827280"), true, -1, true)
-	draw_circle(Vector2(674, 442), 3, Color("#88cab5") if powered else Color("#322b39"))
-	box(153, 488, 530, 7, "#241b2a")
+	if television == Television.ORIGINAL:
+		for x in range(660, 696, 5):
+			rounded(Rect2(x, 137, 2, 163), 1, "#30293a")
+		rounded(Rect2(660, 382, 34, 29), 6, "#3e3446", "#78677b")
+		draw_circle(Vector2(677, 396), 7, Color("#827280"), true, -1, true)
+		draw_circle(Vector2(674, 442), 3, Color("#88cab5") if powered else Color("#322b39"))
+		box(153, 488, 530, 7, "#241b2a")
 	draw_set_transform(Vector2.ZERO)
 
 func draw_console() -> void:
