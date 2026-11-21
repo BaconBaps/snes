@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://pt77mlmk0um4"
-path="res://.godot/imported/bedroom.jpg-07f5d017de522017b2c9b0f4edc408dc.ctex"
+uid="uid://dt1kabx3erpvs"
+path="res://.godot/imported/rain-window.png-ab5ec2180d28cda8c04dd3f1bec061bb.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/bedroom.jpg"
-dest_files=["res://.godot/imported/bedroom.jpg-07f5d017de522017b2c9b0f4edc408dc.ctex"]
+source_file="res://art/rain-window.png"
+dest_files=["res://.godot/imported/rain-window.png-ab5ec2180d28cda8c04dd3f1bec061bb.ctex"]
 
 [params]
 

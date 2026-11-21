@@ -58,6 +58,9 @@ const TRIGGER_RELEASE := 0.35
 const STACK_LIFT := -22.0
 const LABEL_COLORS := ["#367d80", "#a05261", "#646095", "#8b693c"]
 
+var notebook := preload("res://cartridge_notebook.gd").new()
+var shoebox_indices: Array[int] = []
+var notebook_selection := -1
 var titles := PackedStringArray(["Star Hopper", "Midnight Rally", "Moon Orchard", "Wave Rider", "Snow Circuit", "Tiny Atlas"])
 var rom_paths := PackedStringArray()
 var emulator := preload("res://emulator/bridge.gd").new()
@@ -155,7 +158,16 @@ func _ready() -> void:
 	emulator.failed.connect(show_emulator_error)
 
 	setup_settings()
+	add_child(notebook)
+	notebook.setup(self)
 	setup_cartridge_navigation()
+	var notebook_button := Button.new()
+	notebook_button.text = "▤  Notebook"
+	notebook_button.position = Vector2(867, 213)
+	notebook_button.theme = make_settings_theme()
+	notebook_button.focus_mode = Control.FOCUS_NONE
+	notebook_button.pressed.connect(notebook.open_notebook)
+	add_child(notebook_button)
 	get_window().mouse_exited.connect(func(): hovered = -1)
 	# Godot's built-in UI actions otherwise also react to SNES gameplay buttons.
 	for action in InputMap.get_actions():
@@ -181,6 +193,8 @@ func _ready() -> void:
 	add_child(diagnostics)
 	if not rom_folder.is_empty():
 		load_folder(rom_folder)
+	else:
+		refresh_shoebox()
 
 func _exit_tree() -> void:
 	insert_sound.stop()
@@ -266,7 +280,10 @@ func add_settings_heading(menu: VBoxContainer, title: String) -> void:
 	heading.add_theme_color_override("font_color", Color("#ffdbc0"))
 	menu.add_child(heading)
 	var divider := HSeparator.new()
-	divider.add_theme_stylebox_override("separator", settings_style("#796078", "#796078", 0))
+	var rule := StyleBoxLine.new()
+	rule.color = Color("#796078")
+	rule.thickness = 1
+	divider.add_theme_stylebox_override("separator", rule)
 	menu.add_child(divider)
 
 func setup_settings() -> void:
@@ -437,6 +454,8 @@ func add_emulation_controls(page_controls: VBoxContainer) -> void:
 
 func update_crt() -> void:
 	if crt.texture != emulator.picture:
+		if crt.texture == null and emulator.picture and inserted >= 0 and inserted < rom_paths.size():
+			notebook.record_played(rom_paths[inserted])
 		crt.texture = emulator.picture
 		crt.visible = crt.texture != null
 	if crt.material.get_shader_parameter("rgb565") != emulator.rgb565:
@@ -465,10 +484,7 @@ func load_folder(path: String) -> void:
 	dragging = -1
 	seated = false
 	powered = false
-	page = 0
-	refresh_alphabet()
-	update_page_controls()
-	clear_stack_hover()
+	refresh_shoebox()
 	reset_lift()
 	message = "No .sfc or .smc files in this folder." if titles.is_empty() else "Drag a cartridge into the console slot."
 	queue_redraw()
@@ -542,9 +558,30 @@ func reset_lift() -> void:
 func page_size() -> int:
 	return STACK_PAGE_SIZE if stacked else GRID_PAGE_SIZE
 
+func refresh_shoebox(keep_page := false) -> void:
+	shoebox_indices.clear()
+	for path in notebook.current_paths():
+		var index := rom_paths.find(path)
+		if index >= 0:
+			shoebox_indices.append(index)
+	page = mini(page, page_count() - 1) if keep_page else 0
+	notebook_selection = -1
+	clear_stack_hover()
+	refresh_alphabet()
+	update_page_controls()
+	queue_redraw()
+
+func shoebox_position(index: int) -> int:
+	return index if notebook.active_box.is_empty() else shoebox_indices.find(index)
+
+func shoebox_count() -> int:
+	return titles.size() if notebook.active_box.is_empty() else shoebox_indices.size()
+
 func visible_cartridges() -> Array:
 	var size := page_size()
-	return range(page * size, mini(titles.size(), (page + 1) * size))
+	var start := page * size
+	var finish := mini(shoebox_count(), start + size)
+	return range(start, finish) if notebook.active_box.is_empty() else shoebox_indices.slice(start, finish)
 
 func change_layout(index: int) -> void:
 	var first_visible := page * page_size()
@@ -556,7 +593,7 @@ func change_layout(index: int) -> void:
 	queue_redraw()
 
 func desk_position(index: int) -> Vector2:
-	var cell := index % page_size()
+	var cell := shoebox_position(index) % page_size()
 	var row_spacing := STACK_ROW_SPACING if stacked else 98
 	return Vector2(785 + (cell % 2) * 168, (315 if stacked else 258) + floori(cell / 2.0) * row_spacing)
 
@@ -582,6 +619,7 @@ func ease_stack_card(index: int, target: float) -> void:
 			stack_offsets.erase(index))
 
 func clear_stack_hover() -> void:
+	notebook_selection = -1
 	hovered = -1
 	for tween in stack_tweens.values():
 		tween.kill()
@@ -593,7 +631,7 @@ func desk_cartridge_at(point: Vector2) -> int:
 	# Hit-test from front to back, just like the stack is drawn.
 	for offset in range(visible.size() - 1, -1, -1):
 		var index: int = visible[offset]
-		if index != inserted and Rect2(displayed_desk_position(index), CART_SIZE).has_point(point):
+		if index != inserted and index != dragging and Rect2(displayed_desk_position(index), CART_SIZE).has_point(point):
 			return index
 	# Keep the lift stable if the pointer was on the bottom edge when it moved.
 	if hovered >= 0 and Rect2(desk_position(hovered), CART_SIZE).has_point(point):
@@ -634,7 +672,7 @@ func setup_cartridge_navigation() -> void:
 	update_page_controls()
 
 func page_count() -> int:
-	return maxi(1, ceili(titles.size() / float(page_size())))
+	return maxi(1, ceili(shoebox_count() / float(page_size())))
 
 func turn_page(direction: int) -> void:
 	var next_page := clampi(page + direction, 0, page_count() - 1)
@@ -646,13 +684,18 @@ func turn_page(direction: int) -> void:
 	queue_redraw()
 
 func jump_to_title(index: int) -> void:
-	page = floori(index / float(page_size()))
+	var position := shoebox_position(index)
+	if position < 0:
+		return
+	page = floori(position / float(page_size()))
 	clear_stack_hover()
 	update_page_controls()
 	queue_redraw()
 
 func update_page_controls() -> void:
-	page_label.text = "%d / %d" % [page + 1, page_count()]
+	var count := "%d / %d" % [page + 1, page_count()]
+	page_label.text = count if notebook.active_box.is_empty() else "%s  ·  %s" % [notebook.active_box.left(16), count]
+	page_label.tooltip_text = notebook.ALL_GAMES if notebook.active_box.is_empty() else notebook.active_box
 	previous_page_button.disabled = page == 0
 	next_page_button.disabled = page >= page_count() - 1
 
@@ -660,7 +703,9 @@ func refresh_alphabet() -> void:
 	var menu := alphabet_button.get_popup()
 	menu.clear()
 	var seen := {}
-	for index in range(titles.size()):
+	var indices := range(titles.size()) if notebook.active_box.is_empty() else shoebox_indices.duplicate()
+	indices.sort_custom(func(left: int, right: int): return titles[left].naturalnocasecmp_to(titles[right]) < 0)
+	for index in indices:
 		var letter := titles[index].left(1).to_upper()
 		if not "ABCDEFGHIJKLMNOPQRSTUVWXYZ".contains(letter) or letter.is_empty():
 			letter = "#"
@@ -696,7 +741,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			diagnostics.visible = not diagnostics.visible
 	elif event is InputEventMouseMotion:
 		pointer = event.position
-		hovered = desk_cartridge_at(pointer) if stacked and dragging < 0 and not dragging_plug else -1
+		var target := desk_cartridge_at(pointer) if stacked and dragging < 0 and not dragging_plug else -1
+		if target >= 0:
+			notebook_selection = -1
+		hovered = notebook_selection if notebook_selection >= 0 else target
 	elif event is InputEventMouseButton:
 		pointer = event.position
 		if event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -818,6 +866,8 @@ func press_at(point: Vector2) -> void:
 	elif inserted < 0:
 		dragging = desk_cartridge_at(point)
 		if dragging >= 0:
+			notebook_selection = -1
+		if dragging >= 0:
 			hovered = -1
 
 func seated_plug_position(socket: Rect2) -> Vector2:
@@ -862,6 +912,10 @@ func drop_at(point: Vector2) -> void:
 		inserted = -1
 		reset_lift()
 		message = "Drag a cartridge into the console slot."
+	elif not notebook.active_box.is_empty() and DESK.has_point(point):
+		var target := desk_cartridge_at(point)
+		if target >= 0 and target != dragging:
+			notebook.move_to_cartridge(dragging, target)
 	dragging = -1
 
 func start_cartridge() -> void:
@@ -997,7 +1051,10 @@ func cartridge(index: int, at: Vector2, visible_height := CART_SIZE.y) -> void:
 	draw_set_transform(Vector2.ZERO)
 
 func draw_bedroom() -> void:
-	draw_texture_rect(preload("res://art/bedroom.jpg"), Rect2(0, 0, 1152, 648), false)
+	var room_bounds := Rect2(0, 0, 1152, 648)
+	draw_texture_rect(preload("res://art/walls-floor.png"), room_bounds, false)
+	draw_texture_rect(preload("res://art/rain-window.png"), room_bounds, false)
+	draw_texture_rect(preload("res://art/room-details.png"), room_bounds, false)
 	if ceiling_light_on:
 		glow(Vector2(1035, 132), Vector2(255, 219), Color("#ec91a349"))
 
@@ -1280,7 +1337,10 @@ func _draw() -> void:
 	draw_controller_plugs()
 	for index in visible_cartridges():
 		if index != inserted and index != dragging:
-			cartridge(index, displayed_desk_position(index))
+			var position := displayed_desk_position(index)
+			if index == notebook_selection:
+				rounded(Rect2(position - Vector2(3, 3), CART_SIZE + Vector2(6, 6)), 6, "#f7ca9188")
+			cartridge(index, position)
 	draw_shoebox_front()
 	if dragging >= 0:
 		cartridge(dragging, dragged_cartridge_position(pointer))

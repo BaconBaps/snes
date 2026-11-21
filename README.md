@@ -16,6 +16,12 @@ The sample cartridges show a graphical preview without Python or a core. The cor
 
 The ROM folder and preferences are saved in Godot’s per-user data folder. They carry over when you extract an updated project and run it under the same user account.
 
+## Cartridge notebook and shoeboxes
+
+Open **Notebook** beside the shoebox to search by name or filter for favourites, recently played games, and the active shoebox. Choose a result and click **Find in shoebox** to jump to and highlight its cartridge.
+
+To make a custom shoebox, enter a name and click **Create box**. Select a game in the notebook and choose **Add to box**. Use **Move earlier** or **Move later**, or drag a cartridge onto another cartridge in the shoebox to change its place. The notebook remembers favourites, recent games, custom boxes, and their order across launches. Select **All cartridges** to return to the complete ROM library.
+
 ## Cartridge artwork
 
 Put a cropped label image next to its ROM or choose a separate directory under **Settings → Choose cartridge art folder**. Use the same filename before the extension, including any region tags. For example, pair `Super Mario Kart (Europe).sfc` with `Super Mario Kart (Europe).png`. PNG, JPG, and JPEG are supported. The separate artwork folder takes priority when both locations have a match. Games without matching artwork keep their generated labels.
