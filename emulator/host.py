@@ -1,6 +1,8 @@
 """Run a SNES libretro core and stream frames to the Godot room."""
 
 import ctypes as c
+import faulthandler
+import logging
 import os
 from pathlib import Path
 import select
@@ -18,6 +20,7 @@ AUDIO = c.CFUNCTYPE(None, c.c_int16, c.c_int16)
 BATCH = c.CFUNCTYPE(SIZE, VOID, SIZE)
 POLL = c.CFUNCTYPE(None)
 INPUT = c.CFUNCTYPE(c.c_int16, UINT, UINT, UINT, UINT)
+LOG = logging.getLogger("emulator")
 
 
 class Game(c.Structure):
@@ -162,20 +165,28 @@ class Emulator:
             return "Could not access the save-state file."
 
     def run(self, connection, rom_path):
+        LOG.info("Reading ROM")
         rom = rom_path.read_bytes()
         buffer = c.create_string_buffer(rom)
         game = Game(os.fsencode(rom_path), c.cast(buffer, VOID), len(rom), None)
+        LOG.info("Initializing core")
         self.core.retro_init()
         try:
+            LOG.info("Loading cartridge (%d bytes)", len(rom))
             if not self.core.retro_load_game(c.byref(game)):
                 raise RuntimeError("The emulator core could not load this ROM.")
             try:
+                LOG.info("Configuring controllers")
                 self.core.retro_set_controller_port_device(0, 1)
                 self.set_player_two(False)
+                LOG.info("Loading battery save (present: %s)", self.save_path.is_file())
                 self.load_save()
+                LOG.info("Querying audio and video settings")
                 av = AVInfo()
                 self.core.retro_get_system_av_info(c.byref(av))
+                LOG.info("Starting emulation (%.3f fps, %.0f Hz)", av.fps, av.sample_rate)
                 self.stream(connection, av)
+                LOG.info("Playback ended")
             finally:
                 try:
                     self.save()
@@ -190,6 +201,7 @@ class Emulator:
         commands = bytearray()
         sample_start = deadline
         frame_count = 0
+        sent_first_picture = False
         core_seconds = 0.0
         send_seconds = 0.0
         while True:
@@ -226,6 +238,9 @@ class Emulator:
             kind = 2 if self.pixel_format == 2 else 3
             header = struct.pack("<IIIII", kind, self.width, self.height, round(av.sample_rate), len(self.audio))
             connection.sendall(header + self.video + self.audio)
+            if not sent_first_picture and self.video:
+                LOG.info("Sent first picture (%d × %d)", self.width, self.height)
+                sent_first_picture = True
             now = time.monotonic()
             frame_count += 1
             core_seconds += core_end - frame_start
@@ -245,8 +260,7 @@ class Emulator:
                 deadline = time.monotonic()
 
 
-def main():
-    port, nonce, core, rom, save = sys.argv[1:]
+def run_host(port, nonce, core, rom, save):
     # Windows socket waits can otherwise round up to the system timer tick.
     timer = c.WinDLL("winmm") if sys.platform == "win32" else None
     timer_active = timer is not None and timer.timeBeginPeriod(1) == 0
@@ -257,15 +271,41 @@ def main():
             connection.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 1024 * 1024)
             connection.sendall(nonce.encode("ascii"))
             try:
+                LOG.info("Opening core library")
                 Emulator(Path(core), Path(save)).run(connection, Path(rom))
             except (BrokenPipeError, ConnectionResetError):
                 pass
             except Exception as error:
+                LOG.exception("Emulator error")
                 message = str(error).encode("utf-8")[:4096]
                 connection.sendall(struct.pack("<IIIII", 1, 0, 0, 0, len(message)) + message)
     finally:
         if timer_active:
             timer.timeEndPeriod(1)
+
+
+def main():
+    arguments = sys.argv[1:]
+    if len(arguments) == 5:
+        run_host(*arguments)
+        return
+    port, nonce, core, rom, save, log_path = arguments
+    try:
+        log_file = open(log_path, "w", encoding="utf-8", buffering=1)
+    except OSError:
+        run_host(port, nonce, core, rom, save)
+        return
+    with log_file:
+        logging.basicConfig(stream=log_file, level=logging.INFO, format="%(levelname)s %(message)s")
+        faulthandler.enable(file=log_file, all_threads=False)
+        try:
+            LOG.info("Cartridge: %s | Core: %s", Path(rom).name, Path(core).name)
+            run_host(port, nonce, core, rom, save)
+        except Exception:
+            LOG.exception("Emulator host stopped")
+            raise
+        finally:
+            faulthandler.disable()
 
 
 if __name__ == "__main__":

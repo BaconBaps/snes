@@ -8,6 +8,7 @@ signal state_result(message: String)
 
 var rgb565 := true
 
+const LAST_LOG := "user://logs/emulator-last.log"
 const CORE_NAMES := ["Snes9x", "bsnes Balanced"]
 const CORE_FILES := ["snes9x_libretro", "bsnes_mercury_balanced_libretro"]
 const AUDIO_PREROLL_SECONDS := 0.07
@@ -31,6 +32,7 @@ var incoming := PackedByteArray()
 var authenticated := false
 var deadline := 0
 var process_id := -1
+var active_core := ""
 var sent_mask := -1
 var sent_second_mask := -1
 var player_two_connected := false
@@ -64,8 +66,11 @@ func start(rom: String, core_index := 0) -> String:
 		return "Could not open a local connection to the emulator core."
 	nonce = Crypto.new().generate_random_bytes(16).hex_encode().to_ascii_buffer()
 	var python := LocalRuntime.python_executable()
+	var log_path := ProjectSettings.globalize_path(LAST_LOG)
+	DirAccess.make_dir_recursive_absolute(log_path.get_base_dir())
+	active_core = CORE_NAMES[core_index]
 	process_id = OS.create_process(python, [directory.path_join("host.py"),
-		str(server.get_local_port()), nonce.get_string_from_ascii(), core, rom, save])
+		str(server.get_local_port()), nonce.get_string_from_ascii(), core, rom, save, log_path])
 	if process_id <= 0:
 		server.stop()
 		return "Could not start Python. See README for setup."
@@ -85,7 +90,7 @@ func start(rom: String, core_index := 0) -> String:
 
 func stop() -> void:
 	if peer:
-		if authenticated:
+		if authenticated and peer.get_status() == StreamPeerTCP.STATUS_CONNECTED:
 			send_command(81, 0)
 		peer.disconnect_from_host()
 		peer = null
@@ -135,7 +140,7 @@ func _process(_delta: float) -> void:
 	peer.poll()
 	# A single availability snapshot can leave part of a frame behind until the next tick.
 	var budget := MAX_READ_PER_TICK
-	while budget > 0 and peer.get_available_bytes() > 0:
+	while budget > 0 and peer.get_status() == StreamPeerTCP.STATUS_CONNECTED and peer.get_available_bytes() > 0:
 		var received := peer.get_partial_data(mini(READ_CHUNK, budget))
 		var chunk: PackedByteArray = received[1]
 		if received[0] != OK or chunk.is_empty():
@@ -149,7 +154,8 @@ func _process(_delta: float) -> void:
 		authenticated = true
 		incoming = incoming.slice(nonce.size())
 		server.stop()
-		send_command(80, int(player_two_connected))
+		if peer.get_status() == StreamPeerTCP.STATUS_CONNECTED:
+			send_command(80, int(player_two_connected))
 	if not authenticated and Time.get_ticks_msec() >= deadline:
 		report_error("The emulator core connection timed out.")
 		return
@@ -157,10 +163,13 @@ func _process(_delta: float) -> void:
 		read_frames()
 		if not running:
 			return
+	if peer.get_status() != StreamPeerTCP.STATUS_CONNECTED:
+		var phase := "during startup" if picture == null else "during playback"
+		report_error("%s stopped %s. See the emulator log in Settings → Emulation." % [active_core, phase])
+		return
+	if authenticated:
 		update_stats()
 		send_inputs()
-	if peer.get_status() != StreamPeerTCP.STATUS_CONNECTED:
-		report_error("The emulator process stopped.")
 
 func read_frames() -> void:
 	var offset := 0

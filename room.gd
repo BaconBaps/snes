@@ -438,7 +438,7 @@ func setup_settings() -> void:
 	emulation_button.pressed.connect(func():
 		menu.hide()
 		emulation_page.show()
-		settings.popup_centered(Vector2i(344, 412)))
+		settings.popup_centered(Vector2i(344, 450)))
 	menu.add_child(emulation_button)
 
 	var back := Button.new()
@@ -556,6 +556,16 @@ func add_emulation_controls(page_controls: VBoxContainer) -> void:
 	state_status.add_theme_font_size_override("font_size", 13)
 	emulator.state_result.connect(func(result: String): state_status.text = result)
 	page_controls.add_child(state_status)
+
+	var log_button := Button.new()
+	log_button.text = "Open last emulator log"
+	log_button.pressed.connect(func():
+		if FileAccess.file_exists(emulator.LAST_LOG):
+			if OS.shell_open(ProjectSettings.globalize_path(emulator.LAST_LOG)) != OK:
+				state_status.text = "Could not open the emulator log."
+		else:
+			state_status.text = "No emulator log yet. Insert a ROM first.")
+	page_controls.add_child(log_button)
 
 	var scanlines := CheckButton.new()
 	scanlines.text = "Scanlines"

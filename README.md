@@ -64,6 +64,8 @@ Click the hanging light to dim the bedroom. The CRT image and its glow keep thei
 
 **Settings → Emulation** contains the core selector, **Save state**, **Load state**, **Scanlines**, and the **Shader preset** picker. Save states capture the running game and use one slot per ROM and core. These files are separate from battery saves. The display controls take effect immediately.
 
+If a game stops unexpectedly, open **Settings → Emulation → Open last emulator log** before starting another game. The log lists the cartridge, selected core, and last startup step reached. Each launch replaces the previous log.
+
 ## Controls
 
 | Action | Input |
