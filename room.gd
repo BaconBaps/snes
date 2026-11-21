@@ -16,14 +16,14 @@ const PLAYER_TWO_SOCKET := CONSOLE_TRANSFORM * Rect2(440, 591, 35, 8)
 const PLUG_SIZE := Vector2(41, 22)
 const LOOSE_PLUG := Vector2(611, 556)
 const LOOSE_CABLE_END := Vector2(729, 601)
-const DESK := Rect2(770, 301, 354, 259)
+const DESK := Rect2(770, 252, 354, 308)
 const CEILING_LIGHT := Rect2(970, 60, 126, 62)
 enum Television { ORIGINAL, GRAPHITE, SILVER }
 
 const TV_OFFSET := Vector2(0, -55)
 const TV_GLASS := Rect2(153, 96, 480, 360)
 const SCREEN := Rect2(TV_GLASS.position + TV_OFFSET, TV_GLASS.size)
-const CART_SIZE := Vector2(160, 84)
+const CART_SIZE := Vector2(160, 84 * 1.15)
 const LABEL_SIZE := Vector2(CART_SIZE.x - 16, 39)
 const LABEL_RADIUS := 3
 const INSERT_SOUNDS := [
@@ -557,8 +557,8 @@ func change_layout(index: int) -> void:
 
 func desk_position(index: int) -> Vector2:
 	var cell := index % page_size()
-	var row_spacing := STACK_ROW_SPACING if stacked else 85
-	return Vector2(785 + (cell % 2) * 168, (318 if stacked else 301) + floori(cell / 2.0) * row_spacing)
+	var row_spacing := STACK_ROW_SPACING if stacked else 98
+	return Vector2(785 + (cell % 2) * 168, (315 if stacked else 258) + floori(cell / 2.0) * row_spacing)
 
 func displayed_desk_position(index: int) -> Vector2:
 	return desk_position(index) + Vector2(0, stack_offsets.get(index, 0.0))
@@ -976,10 +976,11 @@ func cartridge(index: int, at: Vector2, visible_height := CART_SIZE.y) -> void:
 		rounded(Rect2(31, 56, width - 62, grip_height), 3, "#756e7b", "#d6cdd0")
 		for y in range(58, mini(62, floori(56 + grip_height))):
 			line(Vector2(35, y), Vector2(width - 35, y), "#9b929c")
-	if visible_height >= 74.0:
+	var screw_y := CART_SIZE.y - 13.0
+	if visible_height >= screw_y + 3.0:
 		for x in [11.0, width - 11.0]:
-			draw_circle(Vector2(x, 71), 2.5, Color("#665e6a"), true, -1, true)
-			line(Vector2(x - 1, 71), Vector2(x + 1, 71), "#b5a9b2")
+			draw_circle(Vector2(x, screw_y), 2.5, Color("#665e6a"), true, -1, true)
+			line(Vector2(x - 1, screw_y), Vector2(x + 1, screw_y), "#b5a9b2")
 	draw_set_transform(Vector2.ZERO)
 
 func draw_bedroom() -> void:
@@ -1020,19 +1021,20 @@ func draw_shoebox() -> void:
 	rounded(Rect2(915, 262, 70, 14), 2, "#cfab8c35")
 
 	# The back and side walls frame the darker cardboard interior.
-	shape([Vector2(777, 293), Vector2(1120, 293), Vector2(1131, 556),
+	var rear_lift := 0.0 if stacked else 44.0
+	shape([Vector2(777, 293 - rear_lift), Vector2(1120, 293 - rear_lift), Vector2(1131, 556),
 		Vector2(751, 556)], "#a27c6e")
-	shape([Vector2(781, 299), Vector2(1115, 299), Vector2(1115, 324),
-		Vector2(781, 324)], "#63454a")
-	shape([Vector2(781, 319), Vector2(1115, 319), Vector2(1119, 553),
+	shape([Vector2(781, 299 - rear_lift), Vector2(1115, 299 - rear_lift), Vector2(1115, 324 - rear_lift),
+		Vector2(781, 324 - rear_lift)], "#63454a")
+	shape([Vector2(781, 319 - rear_lift), Vector2(1115, 319 - rear_lift), Vector2(1119, 553),
 		Vector2(764, 553)], "#5c4148")
-	shape([Vector2(777, 301), Vector2(781, 319), Vector2(774, 548),
+	shape([Vector2(777, 301 - rear_lift), Vector2(781, 319 - rear_lift), Vector2(774, 548),
 		Vector2(759, 553)], "#79574f")
-	shape([Vector2(1120, 302), Vector2(1123, 553), Vector2(1109, 548),
-		Vector2(1115, 319)], "#3d2b37")
-	line(Vector2(779, 293), Vector2(1118, 293), "#ca9a7d", 2)
-	line(Vector2(777, 294), Vector2(752, 555), "#c3947c", 2)
-	line(Vector2(1120, 294), Vector2(1130, 555), "#b38671", 2)
+	shape([Vector2(1120, 302 - rear_lift), Vector2(1123, 553), Vector2(1109, 548),
+		Vector2(1115, 319 - rear_lift)], "#3d2b37")
+	line(Vector2(779, 293 - rear_lift), Vector2(1118, 293 - rear_lift), "#ca9a7d", 2)
+	line(Vector2(777, 294 - rear_lift), Vector2(752, 555), "#c3947c", 2)
+	line(Vector2(1120, 294 - rear_lift), Vector2(1130, 555), "#b38671", 2)
 	for index in range(12):
 		var y := 330 + index * 18
 		line(Vector2(778 + (index * 13) % 79, y),
