@@ -35,6 +35,19 @@ const POSTER_DIRECTORY := "user://posters"
 const TV_OFFSET := Vector2(0, -55)
 const TV_GLASS := Rect2(153, 96, 480, 360)
 const SCREEN := Rect2(TV_GLASS.position + TV_OFFSET, TV_GLASS.size)
+const MD_SHELL := preload("res://art/mega-drive-shell.svg")
+const MD_SLOT := Rect2(365, 480, 164, 14)
+const MD_RESET := Rect2(318, 550, 34, 12)
+const MD_CART_SIZE := Vector2(160, 87)
+const MD_LABEL := Rect2(24, 11, 112, 55)
+const MD_SEATED_HEIGHT := 69.0
+const MD_PORT_ONE := Rect2(422, 592, 33, 9)
+const MD_PORT_TWO := Rect2(472, 592, 33, 9)
+const MD_EXTENSIONS := ["md", "gen", "bin", "smd"]
+const SNES_EXTENSIONS := ["sfc", "smc"]
+const SNES_DEMOS := ["Star Hopper", "Midnight Rally", "Moon Orchard", "Wave Rider", "Snow Circuit", "Tiny Atlas"]
+const MD_DEMOS := ["Neon Circuit", "Ocean Shift", "Steel Comet", "Night Speedway", "Cosmic Drift", "Skyline Runner"]
+
 const CART_SIZE := Vector2(160, 84 * 1.15)
 const LABEL_SIZE := Vector2(CART_SIZE.x - 16, 39)
 const LABEL_RADIUS := 3
@@ -84,7 +97,15 @@ var notebook_button := Button.new()
 var notebook := preload("res://cartridge_notebook.gd").new()
 var shoebox_indices: Array[int] = []
 var notebook_selection := -1
-var titles := PackedStringArray(["Star Hopper", "Midnight Rally", "Moon Orchard", "Wave Rider", "Snow Circuit", "Tiny Atlas"])
+@export var megadrive_preview_scene := false
+var megadrive := false
+var snes_rom_folder := ""
+var snes_art_folder := ""
+var md_rom_folder := ""
+var md_art_folder := ""
+var cart_grab_offset := Vector2.ZERO
+var pull_origin := Vector2.ZERO
+var titles := PackedStringArray(SNES_DEMOS)
 var rom_paths := PackedStringArray()
 var emulator := preload("res://emulator/bridge.gd").new()
 var core_picker := OptionButton.new()
@@ -231,10 +252,7 @@ func _ready() -> void:
 	diagnostics.add_theme_font_size_override("font_size", 12)
 	diagnostics.hide()
 	add_child(diagnostics)
-	if not rom_folder.is_empty():
-		load_folder(rom_folder)
-	else:
-		refresh_shoebox()
+	load_console_library()
 
 func _exit_tree() -> void:
 	insert_sound.stop()
@@ -250,10 +268,12 @@ func play_cartridge_sound(player: AudioStreamPlayer, clips: Array, previous: int
 
 func restore_preferences() -> void:
 	var config := ConfigFile.new()
-	if config.load(SETTINGS_PATH) != OK:
-		return
-	rom_folder = str(config.get_value("library", "rom_folder", ""))
-	art_folder = str(config.get_value("library", "art_folder", ""))
+	config.load(SETTINGS_PATH)
+	megadrive = megadrive_preview_scene or bool(config.get_value("room", "megadrive", false))
+	snes_rom_folder = str(config.get_value("library", "rom_folder", ""))
+	snes_art_folder = str(config.get_value("library", "art_folder", ""))
+	md_rom_folder = str(config.get_value("megadrive", "rom_folder", ""))
+	md_art_folder = str(config.get_value("megadrive", "art_folder", ""))
 	stacked = bool(config.get_value("library", "stacked", true))
 	ceiling_light_on = bool(config.get_value("room", "ceiling_light", true))
 	television = clampi(int(config.get_value("room", "television", Television.ORIGINAL)), Television.ORIGINAL, Television.SILVER) as Television
@@ -263,8 +283,11 @@ func restore_preferences() -> void:
 
 func save_preferences() -> void:
 	var config := ConfigFile.new()
-	config.set_value("library", "rom_folder", rom_folder)
-	config.set_value("library", "art_folder", art_folder)
+	config.set_value("library", "rom_folder", library_folder(false))
+	config.set_value("library", "art_folder", library_folder(false, true))
+	config.set_value("megadrive", "rom_folder", library_folder(true))
+	config.set_value("megadrive", "art_folder", library_folder(true, true))
+	config.set_value("room", "megadrive", megadrive)
 	config.set_value("library", "stacked", stacked)
 	config.set_value("room", "ceiling_light", ceiling_light_on)
 	config.set_value("room", "television", television)
@@ -273,6 +296,46 @@ func save_preferences() -> void:
 	config.set_value("emulation", "scanlines", scanlines_enabled)
 	if config.save(SETTINGS_PATH) != OK:
 		push_warning("Could not save Bedroom Arcade settings.")
+
+func library_folder(for_megadrive: bool, artwork := false) -> String:
+	if for_megadrive == megadrive:
+		return art_folder if artwork else rom_folder
+	if for_megadrive:
+		return md_art_folder if artwork else md_rom_folder
+	return snes_art_folder if artwork else snes_rom_folder
+
+func load_console_library() -> void:
+	rom_folder = md_rom_folder if megadrive else snes_rom_folder
+	art_folder = md_art_folder if megadrive else snes_art_folder
+	rom_paths.clear()
+	titles = PackedStringArray(MD_DEMOS if megadrive else SNES_DEMOS)
+	refresh_label_art()
+	if not rom_folder.is_empty():
+		load_folder(rom_folder)
+	else:
+		refresh_shoebox()
+		message = "Drag a cartridge into the console slot."
+
+func switch_console(index: int) -> void:
+	if megadrive == (index == 1):
+		return
+	if megadrive:
+		md_rom_folder = rom_folder
+		md_art_folder = art_folder
+	else:
+		snes_rom_folder = rom_folder
+		snes_art_folder = art_folder
+	emulator.stop()
+	manual.set_rom("")
+	inserted = -1
+	dragging = -1
+	dragging_plug = false
+	seated = false
+	powered = false
+	reset_lift()
+	megadrive = index == 1
+	load_console_library()
+	save_preferences()
 
 func settings_style(fill: String, edge: String, radius: int) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
@@ -347,6 +410,12 @@ func setup_settings() -> void:
 	menu.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 17)
 
 	add_settings_heading(menu, "Settings")
+	var console_picker := OptionButton.new()
+	console_picker.name = "ConsolePicker"
+	console_picker.add_item("Super Nintendo")
+	console_picker.add_item("Mega Drive")
+	console_picker.select(int(megadrive))
+	menu.add_child(console_picker)
 
 	var folder_button := Button.new()
 	folder_button.text = "Choose ROM folder"
@@ -378,7 +447,7 @@ func setup_settings() -> void:
 	back.pressed.connect(func():
 		emulation_page.hide()
 		menu.show()
-		settings.popup_centered(Vector2i(344, 358)))
+		settings.popup_centered(Vector2i(344, 406)))
 	emulation_page.add_child(back)
 	add_settings_heading(emulation_page, "Emulation")
 
@@ -425,6 +494,15 @@ func setup_settings() -> void:
 		settings.hide()
 		scraper.open())
 	menu.add_child(scrape_button)
+	scrape_button.disabled = megadrive
+	scrape_button.tooltip_text = "ScreenScraper downloads are available for SNES."
+	core_picker.disabled = megadrive
+	console_picker.item_selected.connect(func(index: int):
+		switch_console(index)
+		scrape_button.disabled = megadrive
+		core_picker.disabled = megadrive
+		core_label.text = "Mega Drive emulation coming later" if megadrive else "SNES core")
+	core_label.text = "Mega Drive emulation coming later" if megadrive else "SNES core"
 	menu.move_child(scrape_button, art_button.get_index() + 1)
 	for button in [folder_button, art_button, scrape_button, emulation_button]:
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
@@ -458,7 +536,7 @@ func setup_settings() -> void:
 		queue_redraw()
 		emulation_page.hide()
 		menu.show()
-		settings.popup_centered(Vector2i(344, 358)))
+		settings.popup_centered(Vector2i(344, 406)))
 	add_child(gear)
 
 func add_emulation_controls(page_controls: VBoxContainer) -> void:
@@ -534,7 +612,7 @@ func load_folder(path: String) -> void:
 	var files := Array(folder.get_files())
 	files.sort_custom(func(left: String, right: String): return left.naturalnocasecmp_to(right) < 0)
 	for file in files:
-		if file.get_extension().to_lower() in ["sfc", "smc"]:
+		if file.get_extension().to_lower() in (MD_EXTENSIONS if megadrive else SNES_EXTENSIONS):
 			titles.append(file.get_basename())
 			rom_paths.append(path.path_join(file))
 	refresh_label_art()
@@ -544,7 +622,9 @@ func load_folder(path: String) -> void:
 	powered = false
 	refresh_shoebox()
 	reset_lift()
-	message = "No .sfc or .smc files in this folder." if titles.is_empty() else "Drag a cartridge into the console slot."
+	message = "Drag a cartridge into the console slot."
+	if titles.is_empty():
+		message = "No Mega Drive ROMs in this folder." if megadrive else "No .sfc or .smc files in this folder."
 	queue_redraw()
 
 func load_art_folder(path: String) -> void:
@@ -594,7 +674,7 @@ func cartridge_label_texture(index: int) -> Texture2D:
 
 func prepare_label_image(image: Image) -> void:
 	# Cache the stretched, antialiased label at twice its on-screen size.
-	var size := Vector2i(LABEL_SIZE * 2.0)
+	var size := Vector2i((MD_LABEL.size if megadrive else LABEL_SIZE) * 2.0)
 	var radius := LABEL_RADIUS * 2
 	image.resize(size.x, size.y, Image.INTERPOLATE_LANCZOS)
 	image.convert(Image.FORMAT_RGBA8)
@@ -691,19 +771,23 @@ func desk_cartridge_at(point: Vector2) -> int:
 	# Hit-test from front to back, just like the stack is drawn.
 	for offset in range(visible.size() - 1, -1, -1):
 		var index: int = visible[offset]
-		if index != inserted and index != dragging and Rect2(displayed_desk_position(index), CART_SIZE).has_point(point):
+		if index != inserted and index != dragging and Rect2(displayed_desk_position(index), cartridge_size()).has_point(point):
 			return index
 	# Keep the lift stable if the pointer was on the bottom edge when it moved.
-	if hovered >= 0 and Rect2(desk_position(hovered), CART_SIZE).has_point(point):
+	if hovered >= 0 and Rect2(desk_position(hovered), cartridge_size()).has_point(point):
 		return hovered
 	return -1
 
+func cartridge_size() -> Vector2:
+	return MD_CART_SIZE if megadrive else CART_SIZE
+
 func console_position() -> Vector2:
-	var slot_lip := CONSOLE_TRANSFORM * Vector2(SLOT_ART.get_center().x, SLOT_ART.end.y)
-	return slot_lip - Vector2(CART_SIZE.x / 2.0, SEATED_CART_HEIGHT + lift)
+	var slot := MD_SLOT if megadrive else SLOT
+	return Vector2(slot.get_center().x - cartridge_size().x / 2.0, slot.end.y - console_cartridge_height())
 
 func console_cartridge_height() -> float:
-	return minf(CART_SIZE.y, SEATED_CART_HEIGHT + lift)
+	var seated_height := MD_SEATED_HEIGHT if megadrive else SEATED_CART_HEIGHT
+	return minf(cartridge_size().y, seated_height + lift)
 
 func setup_cartridge_navigation() -> void:
 	var controls := HBoxContainer.new()
@@ -780,6 +864,7 @@ func _input(event: InputEvent) -> void:
 			hide_virtual_pointer()
 		if dragging_plug or dragging >= 0:
 			pointer = event.position
+			pull_cartridge_if_moved(pointer)
 			queue_redraw()
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
 		if event.device != POINTER_DEVICE:
@@ -906,15 +991,21 @@ func press_at(point: Vector2) -> void:
 		pointer = point
 		hovered = -1
 		queue_redraw()
-	elif RESET.has_point(point) and seated:
-		if emulator.running:
+	elif (MD_RESET if megadrive else RESET).has_point(point) and seated:
+		if megadrive:
+			message = "Mega Drive reset pressed. Emulation is coming later."
+		elif emulator.running:
 			emulator.reset()
 		elif not powered:
 			start_cartridge()
 		else:
 			preview_started = Time.get_ticks_msec()
 			message = "CRT preview reset."
-	elif EJECT.has_point(point) and seated:
+	elif megadrive and seated and inserted >= 0 and Rect2(console_position(), Vector2(MD_CART_SIZE.x, MD_SEATED_HEIGHT)).has_point(point):
+		dragging = inserted
+		pull_origin = point
+		cart_grab_offset = point - console_position()
+	elif not megadrive and EJECT.has_point(point) and seated:
 		last_eject = play_cartridge_sound(eject_sound, EJECT_SOUNDS, last_eject)
 		emulator.stop()
 		manual.set_rom("")
@@ -928,8 +1019,8 @@ func press_at(point: Vector2) -> void:
 	elif inserted < 0:
 		dragging = desk_cartridge_at(point)
 		if dragging >= 0:
+			cart_grab_offset = point - displayed_desk_position(dragging)
 			notebook_selection = -1
-		if dragging >= 0:
 			hovered = -1
 
 func seated_plug_position(socket: Rect2) -> Vector2:
@@ -938,11 +1029,14 @@ func seated_plug_position(socket: Rect2) -> Vector2:
 func player_two_plug_position() -> Vector2:
 	if dragging_plug:
 		return pointer - plug_grab_offset
-	return seated_plug_position(PLAYER_TWO_SOCKET) if emulator.player_two_connected else LOOSE_PLUG
+	return seated_plug_position(player_two_socket()) if emulator.player_two_connected else LOOSE_PLUG
+
+func player_two_socket() -> Rect2:
+	return MD_PORT_TWO if megadrive else PLAYER_TWO_SOCKET
 
 func plug_over_socket(point: Vector2) -> bool:
 	var plug_center := point - plug_grab_offset + PLUG_SIZE / 2.0
-	return PLAYER_TWO_SOCKET.grow(14).has_point(plug_center)
+	return player_two_socket().grow(14).has_point(plug_center)
 
 func drop_plug(point: Vector2) -> void:
 	var connected := plug_over_socket(point)
@@ -953,16 +1047,32 @@ func drop_plug(point: Vector2) -> void:
 	queue_redraw()
 
 func dragged_cartridge_position(point: Vector2) -> Vector2:
-	return point - CART_SIZE / 2.0
+	return point - (cart_grab_offset if megadrive else CART_SIZE / 2.0)
 
 func cartridge_edge_meets_slot(point: Vector2) -> bool:
-	var cart := Rect2(dragged_cartridge_position(point), CART_SIZE)
-	var overlap := minf(cart.end.x, SLOT.end.x) - maxf(cart.position.x, SLOT.position.x)
-	var edge_near_slot := cart.end.y >= SLOT.position.y - 10.0 and cart.end.y <= SLOT.end.y + 10.0
-	return edge_near_slot and overlap >= CART_SIZE.x * 0.6
+	var slot := MD_SLOT if megadrive else SLOT
+	var cart := Rect2(dragged_cartridge_position(point), cartridge_size())
+	var overlap := minf(cart.end.x, slot.end.x) - maxf(cart.position.x, slot.position.x)
+	var edge_near_slot := cart.end.y >= slot.position.y - 10.0 and cart.end.y <= slot.end.y + 10.0
+	return edge_near_slot and overlap >= cart.size.x * 0.6
+
+func pull_cartridge_if_moved(point: Vector2) -> void:
+	if not megadrive or not seated or dragging != inserted or dragging < 0:
+		return
+	if point.distance_squared_to(pull_origin) < 144.0:
+		return
+	inserted = -1
+	seated = false
+	powered = false
+	manual.set_rom("")
+	message = "Cartridge removed. Drop it back in the slot to play again."
 
 func drop_at(point: Vector2) -> void:
 	if dragging < 0:
+		return
+	pull_cartridge_if_moved(point)
+	if megadrive and seated and dragging == inserted:
+		dragging = -1
 		return
 	if cartridge_edge_meets_slot(point):
 		inserted = dragging
@@ -981,8 +1091,14 @@ func drop_at(point: Vector2) -> void:
 		if target >= 0 and target != dragging:
 			notebook.move_to_cartridge(dragging, target)
 	dragging = -1
+	if megadrive and not seated:
+		message = "Drag a cartridge into the console slot."
 
 func start_cartridge() -> void:
+	if megadrive:
+		powered = true
+		message = "Cartridge seated. Pull it out to power off. Mega Drive emulation is coming later."
+		return
 	if rom_paths.is_empty():
 		powered = true
 		preview_started = Time.get_ticks_msec()
@@ -1003,7 +1119,7 @@ func show_emulator_error(error: String) -> void:
 func _process(delta: float) -> void:
 	update_gamepad_pointer(delta)
 	var target := emulator.screen_light
-	if powered and rom_paths.is_empty():
+	if powered and not megadrive and rom_paths.is_empty():
 		target = Color("#496185")
 	screen_light = screen_light.lerp(target, 1.0 - exp(-delta * 11.0))
 	screen_spill.visible = screen_light.get_luminance() > 0.005
@@ -1013,7 +1129,7 @@ func _process(delta: float) -> void:
 		var status: String = emulator.stats if emulator.running and not emulator.stats.is_empty() else "Insert a ROM to measure playback…"
 		if diagnostics.text != status:
 			diagnostics.text = status
-	if powered and rom_paths.is_empty():
+	if powered and not megadrive and rom_paths.is_empty():
 		queue_redraw()
 
 func box(x: float, y: float, width: float, height: float, color: String) -> void:
@@ -1058,7 +1174,12 @@ func line(from: Vector2, to: Vector2, color: String, width: float = 1.0) -> void
 func uses_black_shell(title: String) -> bool:
 	return title.to_lower().replace("_", " ").strip_edges().begins_with("killer instinct")
 
-func cartridge(index: int, at: Vector2, visible_height := CART_SIZE.y) -> void:
+func cartridge(index: int, at: Vector2, visible_height := -1.0) -> void:
+	if visible_height < 0.0:
+		visible_height = cartridge_size().y
+	if megadrive:
+		draw_megadrive_cartridge(index, at, visible_height)
+		return
 	var width := CART_SIZE.x
 	var black_shell := uses_black_shell(titles[index])
 	draw_set_transform(at)
@@ -1112,6 +1233,39 @@ func cartridge(index: int, at: Vector2, visible_height := CART_SIZE.y) -> void:
 		for x in [11.0, width - 11.0]:
 			draw_circle(Vector2(x, screw_y), 2.5, Color("#101014" if black_shell else "#665e6a"), true, -1, true)
 			line(Vector2(x - 1, screw_y), Vector2(x + 1, screw_y), "#37343d" if black_shell else "#b5a9b2")
+	draw_set_transform(Vector2.ZERO)
+
+func draw_megadrive_cartridge(index: int, at: Vector2, height: float) -> void:
+	draw_set_transform(at)
+	if height == MD_CART_SIZE.y:
+		rounded(Rect2(Vector2(3, 5), MD_CART_SIZE), 11, "#15111e99")
+	var shell := PackedVector2Array([Vector2(0, 11), Vector2(6, 8), Vector2(154, 8), Vector2(160, 11),
+		Vector2(154, height - 7), Vector2(147, height), Vector2(13, height), Vector2(6, height - 7)])
+	var top := Color("#383440")
+	var bottom := Color("#1b1823")
+	draw_polygon(shell, PackedColorArray([top, top, top, top, bottom, bottom, bottom, bottom]))
+	shape([Vector2(0, 11), Vector2(3, 5), Vector2(10, 1), Vector2(150, 1),
+		Vector2(157, 5), Vector2(160, 11)], "#3e3948")
+	line(Vector2(11, 2), Vector2(149, 2), "#77707f")
+	line(Vector2(1, 11), Vector2(159, 11), "#18151d")
+	line(Vector2(5, 16), Vector2(10, height - 9), "#504956")
+	line(Vector2(154, 16), Vector2(149, height - 9), "#111019")
+	var art := cartridge_label_texture(index)
+	var accent: String = LABEL_COLORS[index % LABEL_COLORS.size()]
+	var end_label := Rect2(25, 3, 110, 8)
+	rounded(end_label, 2, accent)
+	if art:
+		draw_texture_rect_region(art, end_label, Rect2(Vector2.ZERO, Vector2(art.get_width(), 7)))
+	else:
+		words(titles[index], 29, 9, 7, 102)
+	rounded(MD_LABEL.grow(0.8), 4, "#14121b", "#5e5260")
+	if art:
+		draw_texture_rect(art, MD_LABEL, false)
+	else:
+		rounded(MD_LABEL, 3, accent)
+		line(Vector2(30, 22), Vector2(75, 22), "#e6b995", 2)
+		words(titles[index], 31, 45, 11, 98)
+		words("MEGA DRIVE", 31, 61, 7, 96)
 	draw_set_transform(Vector2.ZERO)
 
 func setup_posters() -> void:
@@ -1416,7 +1570,7 @@ func draw_television() -> void:
 			rounded(Rect2(139, 84, 508, 387), 18, "#272432", "#6c5b6d")
 			rounded(Rect2(146, 90, 494, 374), 12, "#141623", "#181925")
 	rounded(TV_GLASS, 16, "#171d2d")
-	if powered and rom_paths.is_empty():
+	if powered and not megadrive and rom_paths.is_empty():
 		gradient(TV_GLASS, "#25344e", "#5b4466")
 		var moon := Vector2(508, 209 + sin((Time.get_ticks_msec() - preview_started) / 480.0) * 8)
 		glow(moon, Vector2(125, 115), Color("#f8ad8355"))
@@ -1440,6 +1594,9 @@ func draw_television() -> void:
 	draw_set_transform(Vector2.ZERO)
 
 func draw_console() -> void:
+	if megadrive:
+		draw_megadrive_console()
+		return
 	# The wide front and foreshortened top follow the angled PAL reference.
 	glow(Vector2(414, 587), Vector2(171, 27), Color("#201927b0"))
 	draw_set_transform_matrix(CONSOLE_TRANSFORM)
@@ -1478,6 +1635,46 @@ func draw_console() -> void:
 		line(Vector2(495, 578.3), Vector2(503, 578.3), "#ffacaf")
 	draw_set_transform(Vector2.ZERO)
 
+func draw_megadrive_console() -> void:
+	glow(Vector2(412, 594), Vector2(171, 20), Color("#16121fbf"))
+	draw_texture_rect(MD_SHELL, Rect2(262, 446, 302, 159), false)
+	rounded(MD_SLOT.grow(2), 7, "#393540", "#5c5363")
+	rounded(MD_SLOT, 6, "#100f17", "#16131d")
+	if not seated:
+		line(MD_SLOT.position + Vector2(8, 8), MD_SLOT.position + Vector2(156, 8), "#494350", 2)
+	if dragging >= 0 and not seated and cartridge_edge_meets_slot(pointer):
+		rounded(MD_SLOT.grow(2), 7, "#40353d", "#e9bb87")
+	if inserted >= 0:
+		cartridge(inserted, console_position(), MD_SEATED_HEIGHT)
+		line(MD_SLOT.position + Vector2(5, 14), MD_SLOT.end - Vector2(5, 0), "#292531", 2)
+
+	for y in range(463, 517, 4):
+		var slope := (y - 463) * 0.31
+		line(Vector2(302 - slope, y), Vector2(344 - slope, y), "#15121b", 2)
+		line(Vector2(302 - slope, y + 1.5), Vector2(344 - slope, y + 1.5), "#4b4455")
+	var slider := Rect2(320, 524, 32, 12)
+	rounded(slider, 3, "#18151e", "#565061")
+	var switch_x := 325.0 if powered else 338.0
+	rounded(Rect2(switch_x, 526, 9, 8), 2, "#58505c", "#78707a")
+	line(Vector2(switch_x + 3, 527), Vector2(switch_x + 3, 533), "#b24e56")
+	words("POWER", 322, 545, 7)
+	rounded(MD_RESET.grow(1), 3, "#201c29", "#5e5665")
+	rounded(MD_RESET.grow(-1), 2, "#fff0dc" if MD_RESET.has_point(pointer) and seated else "#d7cfc5")
+	for x in range(323, 348, 4):
+		line(Vector2(x, 554), Vector2(x, 557), "#afa6a4")
+	words("RESET", 323, 571, 7)
+	draw_string(ThemeDB.fallback_font, Vector2(422, 535), "16-BIT", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("#f2d394"))
+	var led := Vector2(447, 550)
+	draw_circle(led, 3.25, Color("#483b44"), true, -1, true)
+	if powered:
+		glow(led, Vector2(13, 9), Color("#fb435475"))
+		draw_circle(led, 2.3, Color("#fc4258"), true, -1, true)
+	words("MEGA DRIVE", 470, 575, 9)
+	for port in [MD_PORT_ONE, MD_PORT_TWO]:
+		rounded(port, 3, "#121017", "#514a59")
+		for x in range(5):
+			draw_circle(port.position + Vector2(6 + 5 * x, 4), 0.8, Color("#746775"), true, -1, true)
+
 func draw_console_wordmark() -> void:
 	var font := ThemeDB.fallback_font
 	var title := "SUPER NINTENDO"
@@ -1501,11 +1698,11 @@ func draw_console_wordmark() -> void:
 	draw_set_transform_matrix(CONSOLE_TRANSFORM)
 
 func draw_controller_plugs() -> void:
-	var first := seated_plug_position(PLAYER_ONE_SOCKET)
+	var first := seated_plug_position(MD_PORT_ONE if megadrive else PLAYER_ONE_SOCKET)
 	var second := player_two_plug_position()
 	if dragging_plug and plug_over_socket(pointer):
-		rounded(PLAYER_TWO_SOCKET.grow(4), 5, "#a47b62", "#ffd7aa")
-	draw_controller_plug(first, Vector2(379, 608))
+		rounded(player_two_socket().grow(4), 5, "#a47b62", "#ffd7aa")
+	draw_controller_plug(first, Vector2(438 if megadrive else 379, 608))
 	draw_controller_plug(second, LOOSE_CABLE_END)
 
 func draw_controller_plug(at: Vector2, cable_end: Vector2) -> void:
@@ -1517,10 +1714,10 @@ func draw_controller_plug(at: Vector2, cable_end: Vector2) -> void:
 	draw_polyline(points, Color("#292633"), 5.0, true)
 	draw_polyline(points, Color("#746e7a"), 2.0, true)
 	rounded(Rect2(at + Vector2(2, 3), PLUG_SIZE), 4, "#29263388")
-	rounded(Rect2(at, PLUG_SIZE), 4, "#676271", "#a49ba5")
-	line(at + Vector2(7, 5), at + Vector2(34, 5), "#a198a6")
-	rounded(Rect2(at + Vector2(8, 9), Vector2(25, 4)), 2, "#524e5e")
-	rounded(Rect2(start - Vector2(4, 3), Vector2(8, 7)), 2, "#5d5967")
+	rounded(Rect2(at, PLUG_SIZE), 4, "#302b38" if megadrive else "#676271", "#696070" if megadrive else "#a49ba5")
+	line(at + Vector2(7, 5), at + Vector2(34, 5), "#625869" if megadrive else "#a198a6")
+	rounded(Rect2(at + Vector2(8, 9), Vector2(25, 4)), 2, "#211e29" if megadrive else "#524e5e")
+	rounded(Rect2(start - Vector2(4, 3), Vector2(8, 7)), 2, "#282532" if megadrive else "#5d5967")
 
 func draw_console_button(rect: Rect2, label: String, color: String) -> void:
 	rounded(rect.grow(2), 5, "#dad3cd", "#9b909a")
@@ -1554,10 +1751,10 @@ func _draw() -> void:
 		if index != inserted and index != dragging:
 			var position := displayed_desk_position(index)
 			if index == notebook_selection:
-				rounded(Rect2(position - Vector2(3, 3), CART_SIZE + Vector2(6, 6)), 6, "#f7ca9188")
+				rounded(Rect2(position - Vector2(3, 3), cartridge_size() + Vector2(6, 6)), 6, "#f7ca9188")
 			cartridge(index, position)
 	draw_shoebox_front()
-	if dragging >= 0:
+	if dragging >= 0 and not (megadrive and seated and dragging == inserted):
 		cartridge(dragging, dragged_cartridge_position(pointer))
 	gradient(Rect2(0, 607, 1152, 41), "#271d2cca", "#1d1726")
 	words(message, 32, 633, 16, 920)

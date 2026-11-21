@@ -34,6 +34,10 @@ Click the **Game notes** pad tucked behind the cartridges to search by name or f
 
 To make a custom shoebox, enter a name and click **Create box**. Select a game in the notebook and choose **Add to box**. Use **Move earlier** or **Move later**, or drag a cartridge onto another cartridge in the shoebox to change its place. The notebook remembers favourites, recent games, custom boxes, and their order across launches. Select **All cartridges** to return to the complete ROM library.
 
+## Mega Drive room preview
+
+Choose **Mega Drive** from the console selector in Settings. The preview has its own ROM and cartridge artwork folders and accepts `.md`, `.gen`, `.bin`, and `.smd` files. You can also try the sample cartridges without choosing a folder. Drag a cartridge into the slot to light the power LED, then grab the exposed cartridge and pull it free to power off. Mega Drive gameplay requires future core integration.
+
 ## Instruction manuals
 
 The portable Windows ZIP includes PDF support. If you run the Godot source project directly, install the optional PDF renderer with `python -m pip install pypdfium2 Pillow` (use `python3` on Linux). Name the PDF like the ROM, for example `Super Mario Kart (Europe).pdf` for `Super Mario Kart (Europe).sfc`. Put it beside the ROM or in a `manuals` subfolder inside the ROM folder.
