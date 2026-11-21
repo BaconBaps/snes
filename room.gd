@@ -840,10 +840,19 @@ func drop_plug(point: Vector2) -> void:
 	dragging_plug = false
 	queue_redraw()
 
+func dragged_cartridge_position(point: Vector2) -> Vector2:
+	return point - CART_SIZE / 2.0
+
+func cartridge_edge_meets_slot(point: Vector2) -> bool:
+	var cart := Rect2(dragged_cartridge_position(point), CART_SIZE)
+	var overlap := minf(cart.end.x, SLOT.end.x) - maxf(cart.position.x, SLOT.position.x)
+	var edge_near_slot := cart.end.y >= SLOT.position.y - 10.0 and cart.end.y <= SLOT.end.y + 10.0
+	return edge_near_slot and overlap >= CART_SIZE.x * 0.6
+
 func drop_at(point: Vector2) -> void:
 	if dragging < 0:
 		return
-	if SLOT.grow(20).has_point(point):
+	if cartridge_edge_meets_slot(point):
 		inserted = dragging
 		seated = true
 		reset_lift()
@@ -1177,7 +1186,7 @@ func draw_console() -> void:
 			Vector2(SLOT_ART.get_center().x - 49.5, SLOT_ART.position.y + 8.4), 99, 6, "#e4dce2")
 		var arrow := Vector2(SLOT_ART.get_center().x, SLOT_ART.end.y - 4.0)
 		shape([arrow + Vector2(-3.5, 0), arrow + Vector2(3.5, 0), arrow + Vector2(0, 2)], "#a7a0ad")
-	if dragging >= 0 and SLOT.grow(20).has_point(pointer):
+	if dragging >= 0 and cartridge_edge_meets_slot(pointer):
 		rounded(SLOT_ART.grow(3), 7, "#eab58975", "#ffdfad")
 	if inserted >= 0 and inserted != dragging:
 		draw_set_transform(Vector2.ZERO)
@@ -1274,7 +1283,7 @@ func _draw() -> void:
 			cartridge(index, displayed_desk_position(index))
 	draw_shoebox_front()
 	if dragging >= 0:
-		cartridge(dragging, pointer - CART_SIZE / 2.0)
+		cartridge(dragging, dragged_cartridge_position(pointer))
 	gradient(Rect2(0, 607, 1152, 41), "#271d2cca", "#1d1726")
 	words(message, 32, 633, 16, 920)
 	words("F11  Fullscreen", 994, 633, 15)
