@@ -1288,7 +1288,12 @@ func draw_manual() -> void:
 		line(Vector2(16, y), Vector2(67, y), "#cdb2b767")
 	if manual.cover:
 		draw_texture_rect(manual.cover, Rect2(3, 3, 78, 93), false, Color(1, 1, 1, manual_opacity))
-	line(Vector2(2, 4), Vector2(2, 97), "#68505c", 1)
+	for x in [81, 83, 85]:
+		line(Vector2(x, 4), Vector2(x, 99), "#b6a090", 1)
+	rounded(Rect2(0, 2, 5, 97), 2, "#49374f")
+	line(Vector2(4, 4), Vector2(4, 96), "#ac8991")
+	for y in [14, 38, 62, 86]:
+		line(Vector2(1, y), Vector2(4, y), "#dfc2b1", 1)
 	draw_set_transform(Vector2.ZERO)
 
 func draw_shoebox_front() -> void:

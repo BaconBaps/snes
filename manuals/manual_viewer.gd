@@ -19,6 +19,9 @@ var previous := Button.new()
 var next := Button.new()
 var zoom := CheckButton.new()
 var paper := TextureRect.new()
+var booklet_material := ShaderMaterial.new()
+var page_turn: Tween
+var previous_page_index := 0
 var page_scroll := ScrollContainer.new()
 
 func setup(room: Node2D) -> void:
@@ -34,6 +37,8 @@ func setup(room: Node2D) -> void:
 	page_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	page_scroll.custom_minimum_size.y = 240
 	contents.add_child(page_scroll)
+	booklet_material.shader = preload("res://manuals/booklet.gdshader")
+	paper.material = booklet_material
 	paper.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	paper.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	paper.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -70,6 +75,7 @@ func setup(room: Node2D) -> void:
 
 func set_rom(rom: String) -> void:
 	stop_render()
+	finish_turn()
 	hide()
 	document_path = find_manual(rom) if not rom.is_empty() else ""
 	cover = null
@@ -104,7 +110,7 @@ func previous_spread() -> int:
 	return maxi(0, page_index - 2)
 
 func request_page(index: int) -> void:
-	if document_path.is_empty() or index < 0 or (page_count > 0 and index >= page_count):
+	if page_turn or document_path.is_empty() or index < 0 or (page_count > 0 and index >= page_count):
 		return
 	stop_render()
 	if DirAccess.make_dir_recursive_absolute(CACHE) != OK:
@@ -118,6 +124,7 @@ func request_page(index: int) -> void:
 		stop_render()
 		show_status("Could not start Python for the manual viewer.")
 		return
+	previous_page_index = page_index
 	page_index = index
 	render_deadline = Time.get_ticks_msec() + 15000
 	show_status("Opening spread…")
@@ -139,7 +146,11 @@ func _process(_delta: float) -> void:
 		return
 	page_count = int(data.get("pages", 0))
 	last_page_on_spread = int(data.get("last_index", page_index))
+	var old_spread := paper.texture
 	paper.texture = ImageTexture.create_from_image(image)
+	booklet_material.set_shader_parameter("bound_spread", last_page_on_spread != page_index)
+	if visible and old_spread and previous_page_index != page_index:
+		animate_turn(old_spread, page_index > previous_page_index)
 	if page_index == 0 and cover == null:
 		var cover_size := Vector2i(int(data.get("first_width", 0)), int(data.get("first_height", 0)))
 		var cover_origin := Vector2i(int(data.get("first_x", 0)), 0)
@@ -154,9 +165,28 @@ func _process(_delta: float) -> void:
 	var spread := "%d–%d" % [first, last] if first != last else str(first)
 	show_status("%s / %d" % [spread, page_count])
 
+func animate_turn(old_spread: Texture2D, forward: bool) -> void:
+	booklet_material.set_shader_parameter("previous_spread", old_spread)
+	booklet_material.set_shader_parameter("turn_forward", forward)
+	booklet_material.set_shader_parameter("turn_progress", 0.0)
+	page_turn = create_tween()
+	page_turn.tween_method(func(amount: float):
+		booklet_material.set_shader_parameter("turn_progress", amount), 0.0, 1.0, 0.38
+	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	page_turn.finished.connect(func():
+		finish_turn()
+		show_status(status.text))
+
+func finish_turn() -> void:
+	if page_turn and page_turn.is_running():
+		page_turn.kill()
+	page_turn = null
+	booklet_material.set_shader_parameter("turn_progress", 1.0)
+	booklet_material.set_shader_parameter("previous_spread", null)
+
 func show_status(value: String) -> void:
 	status.text = value
-	var busy := process_id > 0
+	var busy := process_id > 0 or page_turn != null
 	previous.disabled = busy or page_index <= 0
 	next.disabled = busy or last_page_on_spread + 1 >= page_count
 	zoom.disabled = paper.texture == null

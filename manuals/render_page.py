@@ -35,13 +35,12 @@ def render(path, page_index, output):
             tallest = max(height for _, height in dimensions)
             scale = min(3.0, 950 / widest, 1500 / tallest)
             pages = [render_bitmap(document, index, scale) for index in indices]
-            gutter = 8
             column = max(page.width for page in pages)
-            spread = Image.new("RGBA", (column * 2 + gutter, max(page.height for page in pages)))
-            first_x = column + gutter if page_index == 0 else column - pages[0].width
+            spread = Image.new("RGBA", (column * 2, max(page.height for page in pages)))
+            first_x = column if page_index == 0 else column - pages[0].width
             spread.paste(pages[0], (first_x, 0))
             if has_facing_page:
-                spread.paste(pages[1], (column + gutter, 0))
+                spread.paste(pages[1], (column, 0))
             spread.save(output.with_suffix(".png"))
             return {
                 "pages": page_count, "last_index": indices[-1],
