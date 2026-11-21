@@ -73,6 +73,11 @@ var poster_images: Array[Texture2D] = []
 var editing_poster := -1
 var manual := preload("res://manuals/manual_viewer.gd").new()
 var manual_button := Button.new()
+var manual_fade: Tween
+var manual_opacity := 0.0:
+	set(value):
+		manual_opacity = value
+		queue_redraw()
 var notebook_button := Button.new()
 var notebook := preload("res://cartridge_notebook.gd").new()
 var shoebox_indices: Array[int] = []
@@ -1256,25 +1261,33 @@ func setup_manual() -> void:
 	add_child(manual_button)
 	add_child(manual)
 	manual.setup(self)
-	manual.cover_changed.connect(func():
-		manual_button.visible = not manual.document_path.is_empty()
-		queue_redraw())
+	manual.cover_changed.connect(refresh_manual_cover)
+
+func refresh_manual_cover() -> void:
+	manual_button.visible = not manual.document_path.is_empty()
+	if manual_fade:
+		manual_fade.kill()
+	manual_opacity = 0.0
+	if manual.cover:
+		manual_fade = create_tween()
+		manual_fade.tween_property(self, "manual_opacity", 1.0, 0.38).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 func manual_position() -> Vector2:
 	return Vector2(967, 238 if stacked else 192)
 
 func draw_manual() -> void:
-	if manual.document_path.is_empty():
-		return
 	draw_set_transform(manual_position(), manual_button.rotation)
 	rounded(Rect2(4, 4, 86, 103), 3, "#21172798")
 	rounded(Rect2(2, 2, 85, 102), 2, "#bb9d8a", "#846b74")
 	rounded(Rect2(0, 0, 84, 99), 2, "#dacebd" if manual_button.is_hovered() else "#bba99e", "#d7bfaa")
+	rounded(Rect2(3, 3, 78, 93), 2, "#675975")
+	box(3, 12, 78, 22, "#a28ca3")
+	draw_string(ThemeDB.fallback_font, Vector2(6, 27), "Instructions",
+		HORIZONTAL_ALIGNMENT_CENTER, 72, 11, Color("#332638"))
+	for y in [43, 51, 59]:
+		line(Vector2(16, y), Vector2(67, y), "#cdb2b767")
 	if manual.cover:
-		draw_texture_rect(manual.cover, Rect2(3, 3, 78, 93), false)
-	else:
-		draw_string(ThemeDB.fallback_font, Vector2(6, 22), "Instructions",
-			HORIZONTAL_ALIGNMENT_CENTER, 72, 12, Color("#48384d"))
+		draw_texture_rect(manual.cover, Rect2(3, 3, 78, 93), false, Color(1, 1, 1, manual_opacity))
 	line(Vector2(2, 4), Vector2(2, 97), "#68505c", 1)
 	draw_set_transform(Vector2.ZERO)
 

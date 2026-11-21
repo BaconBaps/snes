@@ -10,6 +10,7 @@ var document_path := ""
 var cover: Texture2D
 var page_index := 0
 var page_count := 0
+var last_page_on_spread := 0
 var process_id := -1
 var output_prefix := ""
 var render_deadline := 0
@@ -51,10 +52,10 @@ func setup(room: Node2D) -> void:
 	controls.add_theme_constant_override("separation", 5)
 	contents.add_child(controls)
 	previous.text = "‹ Previous"
-	previous.pressed.connect(func(): request_page(page_index - 2))
+	previous.pressed.connect(func(): request_page(previous_spread()))
 	controls.add_child(previous)
 	next.text = "Next ›"
-	next.pressed.connect(func(): request_page(page_index + 2))
+	next.pressed.connect(func(): request_page(last_page_on_spread + 1))
 	controls.add_child(next)
 	zoom.text = "2×"
 	zoom.tooltip_text = "Zoom in to read small print"
@@ -75,6 +76,7 @@ func set_rom(rom: String) -> void:
 	paper.texture = null
 	page_index = 0
 	page_count = 0
+	last_page_on_spread = 0
 	zoom.set_pressed_no_signal(false)
 	update_zoom(false)
 	cover_changed.emit()
@@ -95,6 +97,11 @@ func find_manual(rom: String) -> String:
 func open_manual() -> void:
 	if not document_path.is_empty():
 		show()
+
+func previous_spread() -> int:
+	if page_index == page_count - 1 and page_index > 0 and page_index % 2 == 0:
+		return page_index - 1
+	return maxi(0, page_index - 2)
 
 func request_page(index: int) -> void:
 	if document_path.is_empty() or index < 0 or (page_count > 0 and index >= page_count):
@@ -131,17 +138,19 @@ func _process(_delta: float) -> void:
 		show_status(str(data.get("error", "Could not open the manual.")) if data is Dictionary else "Could not open the manual.")
 		return
 	page_count = int(data.get("pages", 0))
+	last_page_on_spread = int(data.get("last_index", page_index))
 	paper.texture = ImageTexture.create_from_image(image)
-	if page_index == 0:
-		var left_size := Vector2i(int(data.get("left_width", 0)), int(data.get("left_height", 0)))
-		if left_size.x > 0 and left_size.y > 0:
-			cover = ImageTexture.create_from_image(image.get_region(Rect2i(Vector2i.ZERO, left_size)))
+	if page_index == 0 and cover == null:
+		var cover_size := Vector2i(int(data.get("first_width", 0)), int(data.get("first_height", 0)))
+		var cover_origin := Vector2i(int(data.get("first_x", 0)), 0)
+		if cover_size.x > 0 and cover_size.y > 0:
+			cover = ImageTexture.create_from_image(image.get_region(Rect2i(cover_origin, cover_size)))
 			cover_changed.emit()
 	update_zoom(zoom.button_pressed)
 	page_scroll.scroll_horizontal = 0
 	page_scroll.scroll_vertical = 0
 	var first := page_index + 1
-	var last := mini(first + 1, page_count)
+	var last := last_page_on_spread + 1
 	var spread := "%d–%d" % [first, last] if first != last else str(first)
 	show_status("%s / %d" % [spread, page_count])
 
@@ -149,7 +158,7 @@ func show_status(value: String) -> void:
 	status.text = value
 	var busy := process_id > 0
 	previous.disabled = busy or page_index <= 0
-	next.disabled = busy or page_index + 2 >= page_count
+	next.disabled = busy or last_page_on_spread + 1 >= page_count
 	zoom.disabled = paper.texture == null
 
 func update_zoom(enabled: bool) -> void:

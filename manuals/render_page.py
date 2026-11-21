@@ -27,24 +27,26 @@ def render(path, page_index, output):
             page_count = len(document)
             if not 0 <= page_index < page_count:
                 return {"error": "This page is unavailable."}
-            last_index = min(page_index + 1, page_count - 1)
-            dimensions = [document.get_page_size(index) for index in range(page_index, last_index + 1)]
-            total_width = sum(width for width, _ in dimensions)
-            if len(dimensions) == 1:
-                total_width *= 2
+            # Reserve the final printed page for the left-hand slot.
+            has_facing_page = 0 < page_index and page_index + 1 < page_count - 1
+            indices = [page_index, page_index + 1] if has_facing_page else [page_index]
+            dimensions = [document.get_page_size(index) for index in indices]
+            widest = max(width for width, _ in dimensions)
             tallest = max(height for _, height in dimensions)
-            scale = min(3.0, 1900 / total_width, 1500 / tallest)
-            left = render_bitmap(document, page_index, scale)
-            right = render_bitmap(document, last_index, scale) if last_index > page_index else None
+            scale = min(3.0, 950 / widest, 1500 / tallest)
+            pages = [render_bitmap(document, index, scale) for index in indices]
             gutter = 8
-            right_width = right.width if right else left.width
-            right_height = right.height if right else left.height
-            spread = Image.new("RGBA", (left.width + gutter + right_width, max(left.height, right_height)))
-            spread.paste(left, (0, 0))
-            if right:
-                spread.paste(right, (left.width + gutter, 0))
+            column = max(page.width for page in pages)
+            spread = Image.new("RGBA", (column * 2 + gutter, max(page.height for page in pages)))
+            first_x = column + gutter if page_index == 0 else column - pages[0].width
+            spread.paste(pages[0], (first_x, 0))
+            if has_facing_page:
+                spread.paste(pages[1], (column + gutter, 0))
             spread.save(output.with_suffix(".png"))
-            return {"pages": page_count, "left_width": left.width, "left_height": left.height}
+            return {
+                "pages": page_count, "last_index": indices[-1],
+                "first_x": first_x, "first_width": pages[0].width, "first_height": pages[0].height,
+            }
     except (ValueError, OSError, RuntimeError, pypdfium2.PdfiumError):
         return {"error": "Could not read this PDF. Check that it opens and is not password-protected."}
 
