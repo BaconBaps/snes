@@ -16,6 +16,18 @@ The sample cartridges show a graphical preview without Python or a core. The cor
 
 The ROM folder and preferences are saved in Godot’s per-user data folder. They carry over when you extract an updated project and run it under the same user account.
 
+## Build a portable Windows ZIP
+
+Install the export templates matching your Godot 4 editor (**Editor → Manage Export Templates**). From the project folder, run this build command with a Python installation that has pip:
+
+```powershell
+python tools/package_windows.py --godot "C:\path\to\Godot.exe"
+```
+
+The output is `dist/Bedroom-Arcade-Windows.zip`. The builder packages an x64 executable, an embedded Python runtime, the PDF renderer, and any supported Windows core DLLs that you have placed in `emulator`. You can point it to a different DLL folder with `--core-dir`. Check the core's redistribution terms before sharing its binary. ROMs and manuals stay in the recipient's own library.
+
+Recipients extract the ZIP and open **Bedroom Arcade.exe**. Keep the adjacent folders with the executable. They do not need Godot, Python, pip, or a separate PDF viewer.
+
 ## Cartridge notebook and shoeboxes
 
 Click the **Game notes** pad tucked behind the cartridges to search by name or filter for favourites, recently played games, and the active shoebox. Choose a result and click **Find in shoebox** to jump to and highlight its cartridge.
@@ -24,7 +36,7 @@ To make a custom shoebox, enter a name and click **Create box**. Select a game i
 
 ## Instruction manuals
 
-Install the optional PDF renderer with `python -m pip install pypdfium2 Pillow` (use `python3` on Linux). Name the PDF like the ROM, for example `Super Mario Kart (Europe).pdf` for `Super Mario Kart (Europe).sfc`. Put it beside the ROM or in a `manuals` subfolder inside the ROM folder.
+The portable Windows ZIP includes PDF support. If you run the Godot source project directly, install the optional PDF renderer with `python -m pip install pypdfium2 Pillow` (use `python3` on Linux). Name the PDF like the ROM, for example `Super Mario Kart (Europe).pdf` for `Super Mario Kart (Europe).sfc`. Put it beside the ROM or in a `manuals` subfolder inside the ROM folder.
 
 When you insert a matching cartridge, its first PDF page becomes the cover of the booklet behind the right-hand stack. Click the booklet to read it over the shoebox. Use **Previous**, **Next**, and **2×** zoom to read small text. The emulator keeps running while the manual is open.
 

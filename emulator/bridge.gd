@@ -1,5 +1,7 @@
 extends Node
 
+const LocalRuntime := preload("res://local_runtime.gd")
+
 signal failed(message: String)
 signal frame_changed
 signal state_result(message: String)
@@ -49,7 +51,7 @@ func _ready() -> void:
 func start(rom: String, core_index := 0) -> String:
 	if process_id > 0 and OS.is_process_running(process_id):
 		return "The previous game is still closing. Try Reset in a moment."
-	var directory := ProjectSettings.globalize_path("res://emulator")
+	var directory := LocalRuntime.app_path("emulator")
 	var extension := ".dll" if OS.get_name() == "Windows" else ".so"
 	var core := directory.path_join(CORE_FILES[core_index] + extension)
 	if not FileAccess.file_exists(core):
@@ -61,9 +63,7 @@ func start(rom: String, core_index := 0) -> String:
 	if server.listen(0, "127.0.0.1") != OK:
 		return "Could not open a local connection to the emulator core."
 	nonce = Crypto.new().generate_random_bytes(16).hex_encode().to_ascii_buffer()
-	var python := OS.get_environment("BEDROOM_ARCADE_PYTHON")
-	if python.is_empty():
-		python = "python" if OS.get_name() == "Windows" else "python3"
+	var python := LocalRuntime.python_executable()
 	process_id = OS.create_process(python, [directory.path_join("host.py"),
 		str(server.get_local_port()), nonce.get_string_from_ascii(), core, rom, save])
 	if process_id <= 0:

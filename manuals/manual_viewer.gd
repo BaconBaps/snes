@@ -1,5 +1,7 @@
 extends PanelContainer
 
+const LocalRuntime := preload("res://local_runtime.gd")
+
 signal cover_changed
 
 const CACHE := "user://manual-cache"
@@ -106,10 +108,8 @@ func request_page(index: int) -> void:
 		show_status("Could not create the manual cache.")
 		return
 	output_prefix = ProjectSettings.globalize_path(CACHE).path_join("page-%d-%d" % [OS.get_process_id(), Time.get_ticks_usec()])
-	var python := OS.get_environment("BEDROOM_ARCADE_PYTHON")
-	if python.is_empty():
-		python = "python" if OS.get_name() == "Windows" else "python3"
-	var script := ProjectSettings.globalize_path("res://manuals/render_page.py")
+	var python := LocalRuntime.python_executable()
+	var script := LocalRuntime.app_path("manuals/render_page.py")
 	process_id = OS.create_process(python, [script, document_path, str(index), output_prefix])
 	if process_id <= 0:
 		stop_render()
