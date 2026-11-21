@@ -23,6 +23,19 @@ INPUT = c.CFUNCTYPE(c.c_int16, UINT, UINT, UINT, UINT)
 LOG = logging.getLogger("emulator")
 
 
+class CoreVariable(c.Structure):
+    _fields_ = [("key", c.c_char_p), ("value", c.c_char_p)]
+
+
+# Mercury's built-in DSP implementation supports cartridges such as Super Mario Kart.
+# The core gates its DSP option behind the advanced-settings flag.
+# Keep the returned C strings alive for the lifetime of the host.
+BSNES_OPTIONS = {
+    b"bsnes_violate_accuracy": b"enabled",
+    b"bsnes_chip_hle": b"HLE",
+}
+
+
 class Game(c.Structure):
     _fields_ = [("path", c.c_char_p), ("data", VOID), ("size", SIZE), ("meta", c.c_char_p)]
 
@@ -87,6 +100,11 @@ class Emulator:
         elif command in (9, 31):  # GET_SYSTEM_DIRECTORY, GET_SAVE_DIRECTORY
             c.cast(data, c.POINTER(c.c_char_p))[0] = self.system_dir
             return True
+        elif command == 15:  # GET_VARIABLE
+            variable = c.cast(data, c.POINTER(CoreVariable)).contents
+            if variable.key in BSNES_OPTIONS:
+                variable.value = BSNES_OPTIONS[variable.key]
+                return True
         elif command == 17:  # GET_VARIABLE_UPDATE
             c.cast(data, c.POINTER(c.c_bool))[0] = False
             return True
@@ -278,7 +296,13 @@ def run_host(port, nonce, core, rom, save):
             except Exception as error:
                 LOG.exception("Emulator error")
                 message = str(error).encode("utf-8")[:4096]
-                connection.sendall(struct.pack("<IIIII", 1, 0, 0, 0, len(message)) + message)
+                try:
+                    connection.sendall(struct.pack("<IIIII", 1, 0, 0, 0, len(message)) + message)
+                    # Let Godot consume the error before closing the connection.
+                    while connection.recv(1024):
+                        pass
+                except OSError:
+                    pass
     finally:
         if timer_active:
             timer.timeEndPeriod(1)
