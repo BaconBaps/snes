@@ -38,7 +38,7 @@ To make a custom shoebox, enter a name and click **Create box**. Select a game i
 
 The portable Windows ZIP includes PDF support. If you run the Godot source project directly, install the optional PDF renderer with `python -m pip install pypdfium2 Pillow` (use `python3` on Linux). Name the PDF like the ROM, for example `Super Mario Kart (Europe).pdf` for `Super Mario Kart (Europe).sfc`. Put it beside the ROM or in a `manuals` subfolder inside the ROM folder.
 
-When you insert a matching cartridge, its first PDF page becomes the cover of the booklet behind the right-hand stack. Click the booklet to read it over the shoebox. Use **Previous**, **Next**, and **2×** zoom to read small text. The emulator keeps running while the manual is open.
+When you insert a matching cartridge, its first PDF page becomes the cover of the booklet behind the right-hand stack. Click the booklet to read two facing pages over the shoebox. The controls are centred below the spread. Use **Previous**, **Next**, and **2×** zoom to read small text. The emulator keeps running while the manual is open.
 
 ## Cartridge artwork
 

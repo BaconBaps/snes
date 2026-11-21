@@ -13,7 +13,6 @@ var page_count := 0
 var process_id := -1
 var output_prefix := ""
 var render_deadline := 0
-var heading := Label.new()
 var status := Label.new()
 var previous := Button.new()
 var next := Button.new()
@@ -26,20 +25,10 @@ func setup(room: Node2D) -> void:
 	position = Vector2(736, 193)
 	size = Vector2(400, 410)
 	theme = room.make_settings_theme()
-	add_theme_stylebox_override("panel", room.settings_style("#211a2c", "#9b798a", 9))
+	add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	var contents := VBoxContainer.new()
 	contents.add_theme_constant_override("separation", 5)
 	add_child(contents)
-
-	var top := HBoxContainer.new()
-	contents.add_child(top)
-	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	heading.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	top.add_child(heading)
-	var close := Button.new()
-	close.text = "Close"
-	close.pressed.connect(hide)
-	top.add_child(close)
 
 	page_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	page_scroll.custom_minimum_size.y = 240
@@ -51,22 +40,30 @@ func setup(room: Node2D) -> void:
 	paper.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	page_scroll.add_child(paper)
 
+	status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	status.add_theme_color_override("font_outline_color", Color("#211a2c"))
+	status.add_theme_constant_override("outline_size", 4)
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	status.custom_minimum_size.x = 310
 	contents.add_child(status)
 	var controls := HBoxContainer.new()
+	controls.alignment = BoxContainer.ALIGNMENT_CENTER
 	controls.add_theme_constant_override("separation", 5)
 	contents.add_child(controls)
 	previous.text = "‹ Previous"
-	previous.pressed.connect(func(): request_page(page_index - 1))
+	previous.pressed.connect(func(): request_page(page_index - 2))
 	controls.add_child(previous)
 	next.text = "Next ›"
-	next.pressed.connect(func(): request_page(page_index + 1))
+	next.pressed.connect(func(): request_page(page_index + 2))
 	controls.add_child(next)
 	zoom.text = "2×"
 	zoom.tooltip_text = "Zoom in to read small print"
 	zoom.toggled.connect(update_zoom)
 	controls.add_child(zoom)
+	var close := Button.new()
+	close.text = "Close"
+	close.pressed.connect(hide)
+	controls.add_child(close)
 	hide()
 	set_process(false)
 
@@ -80,7 +77,6 @@ func set_rom(rom: String) -> void:
 	page_count = 0
 	zoom.set_pressed_no_signal(false)
 	update_zoom(false)
-	heading.text = rom.get_file().get_basename()
 	cover_changed.emit()
 	if not document_path.is_empty():
 		request_page(0)
@@ -117,7 +113,7 @@ func request_page(index: int) -> void:
 		return
 	page_index = index
 	render_deadline = Time.get_ticks_msec() + 15000
-	show_status("Opening page…")
+	show_status("Opening spread…")
 	set_process(true)
 
 func _process(_delta: float) -> void:
@@ -137,18 +133,23 @@ func _process(_delta: float) -> void:
 	page_count = int(data.get("pages", 0))
 	paper.texture = ImageTexture.create_from_image(image)
 	if page_index == 0:
-		cover = paper.texture
-		cover_changed.emit()
+		var left_size := Vector2i(int(data.get("left_width", 0)), int(data.get("left_height", 0)))
+		if left_size.x > 0 and left_size.y > 0:
+			cover = ImageTexture.create_from_image(image.get_region(Rect2i(Vector2i.ZERO, left_size)))
+			cover_changed.emit()
 	update_zoom(zoom.button_pressed)
 	page_scroll.scroll_horizontal = 0
 	page_scroll.scroll_vertical = 0
-	show_status("Page %d / %d" % [page_index + 1, page_count])
+	var first := page_index + 1
+	var last := mini(first + 1, page_count)
+	var spread := "%d–%d" % [first, last] if first != last else str(first)
+	show_status("%s / %d" % [spread, page_count])
 
 func show_status(value: String) -> void:
 	status.text = value
 	var busy := process_id > 0
 	previous.disabled = busy or page_index <= 0
-	next.disabled = busy or page_index + 1 >= page_count
+	next.disabled = busy or page_index + 2 >= page_count
 	zoom.disabled = paper.texture == null
 
 func update_zoom(enabled: bool) -> void:
