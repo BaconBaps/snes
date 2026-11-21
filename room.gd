@@ -1816,10 +1816,13 @@ func draw_controller_plugs() -> void:
 
 func draw_controller_plug(at: Vector2, cable_end: Vector2) -> void:
 	var start := at + Vector2(PLUG_SIZE.x / 2.0, PLUG_SIZE.y - 1.0)
+	var exit_bend := cable_end - Vector2(0, 16)
+	var bend_height := maxf(0.0, exit_bend.y - start.y)
 	var points := PackedVector2Array()
 	for index in range(33):
-		points.append(start.bezier_interpolate(start + Vector2(0, 31),
-			cable_end - Vector2(0, 24), cable_end, index / 32.0))
+		points.append(start.bezier_interpolate(start + Vector2(0, bend_height * 0.55),
+			exit_bend - Vector2(0, bend_height * 0.3), exit_bend, index / 32.0))
+	points.append(cable_end)
 	draw_polyline(points, Color("#292633"), 5.0, true)
 	draw_polyline(points, Color("#746e7a"), 2.0, true)
 	rounded(Rect2(at + Vector2(2, 3), PLUG_SIZE), 4, "#29263388")
