@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dt1kabx3erpvs"
-path="res://.godot/imported/rain-window.png-ab5ec2180d28cda8c04dd3f1bec061bb.ctex"
+uid="uid://bv38mvjbde7r7"
+path="res://.godot/imported/poster-quest.png-c024c6016e380c8be351cde63d364f56.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/rain-window.png"
-dest_files=["res://.godot/imported/rain-window.png-ab5ec2180d28cda8c04dd3f1bec061bb.ctex"]
+source_file="res://art/poster-quest.png"
+dest_files=["res://.godot/imported/poster-quest.png-c024c6016e380c8be351cde63d364f56.ctex"]
 
 [params]
 

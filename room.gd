@@ -20,6 +20,16 @@ const DESK := Rect2(770, 252, 354, 308)
 const CEILING_LIGHT := Rect2(970, 60, 126, 62)
 enum Television { ORIGINAL, GRAPHITE, SILVER }
 
+const POSTER_RECTS := [Rect2(736, 58, 91, 112), Rect2(855, 29, 101, 62),
+	Rect2(866, 110, 96, 86), Rect2(1046, 132, 67, 73)]
+const POSTER_TILTS := [-9.0, 5.0, -4.0, 8.0]
+const POSTER_ART := [
+	preload("res://art/poster-starfighter.png"),
+	preload("res://art/poster-racer.png"),
+	preload("res://art/poster-quest.png"),
+	preload("res://art/poster-platformer.png"),
+]
+const POSTER_DIRECTORY := "user://posters"
 const TV_OFFSET := Vector2(0, -55)
 const TV_GLASS := Rect2(153, 96, 480, 360)
 const SCREEN := Rect2(TV_GLASS.position + TV_OFFSET, TV_GLASS.size)
@@ -58,6 +68,9 @@ const TRIGGER_RELEASE := 0.35
 const STACK_LIFT := -22.0
 const LABEL_COLORS := ["#367d80", "#a05261", "#646095", "#8b693c"]
 
+var poster_picker := FileDialog.new()
+var poster_images: Array[Texture2D] = []
+var editing_poster := -1
 var notebook_button := Button.new()
 var notebook := preload("res://cartridge_notebook.gd").new()
 var shoebox_indices: Array[int] = []
@@ -162,6 +175,7 @@ func _ready() -> void:
 	add_child(notebook)
 	notebook.setup(self)
 	setup_cartridge_navigation()
+	setup_posters()
 	notebook_button.name = "NotebookButton"
 	notebook_button.flat = true
 	notebook_button.focus_mode = Control.FOCUS_NONE
@@ -1057,11 +1071,86 @@ func cartridge(index: int, at: Vector2, visible_height := CART_SIZE.y) -> void:
 			line(Vector2(x - 1, screw_y), Vector2(x + 1, screw_y), "#37343d" if black_shell else "#b5a9b2")
 	draw_set_transform(Vector2.ZERO)
 
+func setup_posters() -> void:
+	poster_picker.access = FileDialog.ACCESS_FILESYSTEM
+	poster_picker.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+	poster_picker.title = "Choose poster artwork"
+	poster_picker.filters = PackedStringArray(["*.png, *.jpg, *.jpeg, *.webp ; Images"])
+	poster_picker.file_selected.connect(import_poster)
+	poster_picker.add_button("Restore original", true, "restore")
+	poster_picker.custom_action.connect(func(_action: String): restore_poster())
+	add_child(poster_picker)
+
+	for index in range(POSTER_RECTS.size()):
+		var custom := Image.new()
+		var path := poster_path(index)
+		if FileAccess.file_exists(path) and custom.load(path) == OK and not custom.is_empty():
+			poster_images.append(ImageTexture.create_from_image(custom))
+		else:
+			poster_images.append(POSTER_ART[index])
+		var frame: Rect2 = POSTER_RECTS[index]
+		var hotspot := Button.new()
+		hotspot.name = "Poster%d" % (index + 1)
+		hotspot.flat = true
+		hotspot.focus_mode = Control.FOCUS_NONE
+		hotspot.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		hotspot.tooltip_text = "Change poster artwork"
+		hotspot.position = frame.position
+		hotspot.size = frame.size
+		hotspot.rotation = deg_to_rad(POSTER_TILTS[index])
+		hotspot.pressed.connect(func():
+			editing_poster = index
+			poster_picker.popup_centered_ratio(0.72))
+		add_child(hotspot)
+
+func poster_path(index: int) -> String:
+	return POSTER_DIRECTORY.path_join("poster-%d.png" % (index + 1))
+
+func import_poster(path: String) -> void:
+	if editing_poster < 0 or editing_poster >= poster_images.size():
+		return
+	var image := Image.new()
+	if image.load(path) != OK or image.is_empty():
+		message = "That poster image could not be opened."
+		queue_redraw()
+		return
+	var frame: Rect2 = POSTER_RECTS[editing_poster]
+	image.resize(roundi(frame.size.x * 4.0), roundi(frame.size.y * 4.0), Image.INTERPOLATE_LANCZOS)
+	if DirAccess.make_dir_recursive_absolute(POSTER_DIRECTORY) != OK or image.save_png(poster_path(editing_poster)) != OK:
+		message = "Could not save the poster artwork."
+		queue_redraw()
+		return
+	poster_images[editing_poster] = ImageTexture.create_from_image(image)
+	queue_redraw()
+
+func restore_poster() -> void:
+	if editing_poster < 0 or editing_poster >= poster_images.size():
+		return
+	var path := poster_path(editing_poster)
+	if FileAccess.file_exists(path) and DirAccess.remove_absolute(path) != OK:
+		message = "Could not restore the original poster."
+	else:
+		poster_images[editing_poster] = POSTER_ART[editing_poster]
+	poster_picker.hide()
+	queue_redraw()
+
+func draw_posters() -> void:
+	for index in range(poster_images.size()):
+		var frame: Rect2 = POSTER_RECTS[index]
+		draw_set_transform(frame.position, deg_to_rad(POSTER_TILTS[index]))
+		draw_rect(Rect2(Vector2(3, 5), frame.size), Color("#160e2080"))
+		draw_rect(Rect2(Vector2.ZERO, frame.size), Color("#baa29c"))
+		draw_texture_rect(poster_images[index], Rect2(Vector2.ZERO, frame.size).grow(-2.0), false, Color("#d6bdcc"))
+		var tape_x := 10.0 if index % 2 == 0 else frame.size.x - 27.0
+		box(tape_x, -2, 17, 5, "#e1bc995a")
+		draw_set_transform(Vector2.ZERO)
+
 func draw_bedroom() -> void:
 	var room_bounds := Rect2(0, 0, 1152, 648)
 	draw_texture_rect(preload("res://art/walls-floor.png"), room_bounds, false)
-	draw_texture_rect(preload("res://art/rain-window.png"), room_bounds, false)
+	draw_texture_rect(preload("res://art/closed-curtains.png"), room_bounds, false)
 	draw_texture_rect(preload("res://art/room-details.png"), room_bounds, false)
+	draw_posters()
 	if ceiling_light_on:
 		glow(Vector2(1035, 132), Vector2(255, 219), Color("#ec91a349"))
 

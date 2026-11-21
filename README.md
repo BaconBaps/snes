@@ -30,6 +30,8 @@ Artwork stretches to fill the rounded label area. Crop it to roughly 3.7:1 befor
 
 ## Room and emulation settings
 
+Click any wall poster to choose a PNG, JPG, JPEG, or WebP image. It stretches to fill that poster and is saved for future launches. Choose **Restore original** in the same dialog to bring back its original artwork.
+
 Click the hanging light to dim the bedroom. The CRT image and its glow keep their brightness. Use **Settings → CRT television** to choose the Original, Graphite, or Silver cabinet.
 
 **Settings → Emulation** contains the core selector, **Save state**, **Load state**, **Scanlines**, and the **Shader preset** picker. Save states capture the running game and use one slot per ROM and core. These files are separate from battery saves. The display controls take effect immediately.
