@@ -91,6 +91,12 @@ Move either analogue stick on the first gamepad to reveal and steer the virtual 
 
 The D-pad, face buttons, L1/R1, Start and Back/Select remain mapped to SNES gameplay. You can move the virtual pointer without moving your character.
 
+## SNES Mouse
+
+Mario Paint filenames select the SNES Mouse automatically. For other titles, insert the cartridge and choose **SNES Mouse** under **Settings → Emulation → Controller port 1**. The choice is saved for that ROM. **Auto** uses the filename to choose between the mouse and gamepad.
+
+Click the CRT to capture the mouse. Move it and use the left and right buttons in the game. Press **Esc** to return to the room. The mouse also releases when the window loses focus or playback stops.
+
 ## Playback diagnostics
 
 Press **F10** while playing to show timing for the current session. Play for a few seconds before reading it. **Core** shows the measured emulation rate and the game's nominal rate. **Received** counts completed frame packets per second, and **CRT** counts video uploads per second. **Godot** shows the window's render rate. **Audio underruns** counts times the generator ran out of samples during the last interval. If playback stutters, capture both lines while it is happening.

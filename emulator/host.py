@@ -46,13 +46,15 @@ class AVInfo(c.Structure):
 
 
 class Emulator:
-    def __init__(self, core_path, save_path):
+    def __init__(self, core_path, save_path, mouse_enabled=False):
         self.core = c.CDLL(str(core_path))
         self.save_path = save_path
         self.state_path = save_path.with_suffix(f".{core_path.stem}.state")
         self.system_dir = os.fsencode(save_path.parent)
         self.pixel_format = 0
         self.buttons = [0, 0]
+        self.mouse_enabled = mouse_enabled
+        self.clear_mouse()
         self.player_two_connected = False
         self.audio = bytearray()
         self.video = b""
@@ -134,9 +136,35 @@ class Emulator:
         return count
 
     def input_state(self, port, device, index, button):
+        if self.mouse_enabled and port == 0:
+            if device == 2 and index == 0 and button < 4:
+                return self.mouse_frame[button]
+            return 0
         if port < 2 and device == 1 and index == 0 and button < 12:
             return (self.buttons[port] >> button) & 1
         return 0
+
+    def clear_mouse(self):
+        self.mouse_motion = [0, 0]
+        self.mouse_buttons = 0
+        self.mouse_pressed = 0
+        self.mouse_frame = (0, 0, 0, 0)
+
+    def prepare_mouse_frame(self):
+        # A SNES Mouse reports up to 127 counts per axis at a time.
+        dx, dy = (max(-127, min(127, value)) for value in self.mouse_motion)
+        self.mouse_motion[0] -= dx
+        self.mouse_motion[1] -= dy
+        buttons = self.mouse_buttons | self.mouse_pressed
+        self.mouse_pressed = 0
+        self.mouse_frame = (dx, dy, buttons & 1, (buttons >> 1) & 1)
+
+    def set_port_one(self, mouse_enabled):
+        self.mouse_enabled = mouse_enabled
+        self.buttons[0] = 0
+        self.clear_mouse()
+        self.core.retro_set_controller_port_device(0, 2 if mouse_enabled else 1)
+        LOG.info("Controller port 1: %s", "SNES Mouse" if mouse_enabled else "Gamepad")
 
     def set_player_two(self, connected):
         self.player_two_connected = connected
@@ -195,7 +223,7 @@ class Emulator:
                 raise RuntimeError("The emulator core could not load this ROM.")
             try:
                 LOG.info("Configuring controllers")
-                self.core.retro_set_controller_port_device(0, 1)
+                self.set_port_one(self.mouse_enabled)
                 self.set_player_two(False)
                 LOG.info("Loading battery save (present: %s)", self.save_path.is_file())
                 self.load_save()
@@ -241,6 +269,18 @@ class Emulator:
                         connection.sendall(struct.pack("<IIIII", 5, 0, 0, 0, len(message)) + message)
                     elif command == ord("P"):
                         self.set_player_two(bool(mask))
+                    elif command == ord("D") and bool(mask) != self.mouse_enabled:
+                        self.set_port_one(bool(mask))
+                    elif command == ord("C"):
+                        self.clear_mouse()
+                    elif self.mouse_enabled and command in (ord("X"), ord("Y")):
+                        axis = command - ord("X")
+                        value = mask if mask < 32768 else mask - 65536
+                        self.mouse_motion[axis] = max(-4096, min(4096, self.mouse_motion[axis] + value))
+                    elif self.mouse_enabled and command == ord("M"):
+                        buttons = mask & 3
+                        self.mouse_pressed |= buttons & ~self.mouse_buttons
+                        self.mouse_buttons = buttons
                     elif command == ord("I"):
                         self.buttons[0] = mask
                     elif command == ord("J") and self.player_two_connected:
@@ -251,6 +291,8 @@ class Emulator:
             self.video = b""
             self.width = self.height = 0
             frame_start = time.monotonic()
+            if self.mouse_enabled:
+                self.prepare_mouse_frame()
             self.core.retro_run()
             core_end = time.monotonic()
             kind = 2 if self.pixel_format == 2 else 3
@@ -278,7 +320,7 @@ class Emulator:
                 deadline = time.monotonic()
 
 
-def run_host(port, nonce, core, rom, save):
+def run_host(port, nonce, core, rom, save, mouse_enabled=False):
     # Windows socket waits can otherwise round up to the system timer tick.
     timer = c.WinDLL("winmm") if sys.platform == "win32" else None
     timer_active = timer is not None and timer.timeBeginPeriod(1) == 0
@@ -290,7 +332,7 @@ def run_host(port, nonce, core, rom, save):
             connection.sendall(nonce.encode("ascii"))
             try:
                 LOG.info("Opening core library")
-                Emulator(Path(core), Path(save)).run(connection, Path(rom))
+                Emulator(Path(core), Path(save), mouse_enabled).run(connection, Path(rom))
             except (BrokenPipeError, ConnectionResetError):
                 pass
             except Exception as error:
@@ -313,18 +355,19 @@ def main():
     if len(arguments) == 5:
         run_host(*arguments)
         return
-    port, nonce, core, rom, save, log_path = arguments
+    port, nonce, core, rom, save, log_path, *options = arguments
+    mouse_enabled = options == ["mouse"]
     try:
         log_file = open(log_path, "w", encoding="utf-8", buffering=1)
     except OSError:
-        run_host(port, nonce, core, rom, save)
+        run_host(port, nonce, core, rom, save, mouse_enabled)
         return
     with log_file:
         logging.basicConfig(stream=log_file, level=logging.INFO, format="%(levelname)s %(message)s")
         faulthandler.enable(file=log_file, all_threads=False)
         try:
             LOG.info("Cartridge: %s | Core: %s", Path(rom).name, Path(core).name)
-            run_host(port, nonce, core, rom, save)
+            run_host(port, nonce, core, rom, save, mouse_enabled)
         except Exception:
             LOG.exception("Emulator host stopped")
             raise

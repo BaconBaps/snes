@@ -36,6 +36,8 @@ var active_core := ""
 var sent_mask := -1
 var sent_second_mask := -1
 var player_two_connected := false
+var mouse_enabled := false
+var mouse_motion := Vector2.ZERO
 var audio := AudioStreamPlayer.new()
 var playback: AudioStreamGeneratorPlayback
 var audio_preroll := PackedVector2Array()
@@ -50,7 +52,7 @@ func _ready() -> void:
 	add_child(audio)
 	set_process(false)
 
-func start(rom: String, core_index := 0) -> String:
+func start(rom: String, core_index := 0, use_mouse := false) -> String:
 	if process_id > 0 and OS.is_process_running(process_id):
 		return "The previous game is still closing. Try Reset in a moment."
 	var directory := LocalRuntime.app_path("emulator")
@@ -69,12 +71,17 @@ func start(rom: String, core_index := 0) -> String:
 	var log_path := ProjectSettings.globalize_path(LAST_LOG)
 	DirAccess.make_dir_recursive_absolute(log_path.get_base_dir())
 	active_core = CORE_NAMES[core_index]
-	process_id = OS.create_process(python, [directory.path_join("host.py"),
-		str(server.get_local_port()), nonce.get_string_from_ascii(), core, rom, save, log_path])
+	var arguments := [directory.path_join("host.py"), str(server.get_local_port()),
+		nonce.get_string_from_ascii(), core, rom, save, log_path]
+	if use_mouse:
+		arguments.append("mouse")
+	process_id = OS.create_process(python, arguments)
 	if process_id <= 0:
 		server.stop()
 		return "Could not start Python. See README for setup."
 	running = true
+	mouse_enabled = use_mouse
+	mouse_motion = Vector2.ZERO
 	authenticated = false
 	sent_mask = -1
 	sent_second_mask = -1
@@ -89,6 +96,8 @@ func start(rom: String, core_index := 0) -> String:
 	return ""
 
 func stop() -> void:
+	mouse_motion = Vector2.ZERO
+	mouse_enabled = false
 	if peer:
 		if authenticated and peer.get_status() == StreamPeerTCP.STATUS_CONNECTED:
 			send_command(81, 0)
@@ -121,6 +130,33 @@ func set_player_two(connected: bool) -> void:
 	sent_second_mask = -1
 	if running and authenticated:
 		send_command(80, int(connected))
+
+func set_mouse_device(enabled: bool) -> void:
+	if mouse_enabled == enabled:
+		return
+	mouse_enabled = enabled
+	mouse_motion = Vector2.ZERO
+	sent_mask = -1
+	if authenticated:
+		send_command(68, int(enabled)) # D: port 1 device
+
+func set_mouse_buttons(buttons: int) -> void:
+	if authenticated and mouse_enabled:
+		send_command(77, buttons) # M: button mask
+
+func clear_mouse() -> void:
+	mouse_motion = Vector2.ZERO
+	if authenticated and mouse_enabled and peer:
+		send_command(67, 0) # C: neutral state, including queued motion
+
+func send_mouse_motion() -> void:
+	var dx := clampi(int(mouse_motion.x), -32768, 32767)
+	var dy := clampi(int(mouse_motion.y), -32768, 32767)
+	mouse_motion -= Vector2(dx, dy)
+	if dx != 0:
+		send_command(88, dx & 0xffff) # X: signed relative motion
+	if dy != 0:
+		send_command(89, dy & 0xffff) # Y: signed relative motion
 
 func _exit_tree() -> void:
 	stop()
@@ -156,6 +192,7 @@ func _process(_delta: float) -> void:
 		server.stop()
 		if peer.get_status() == StreamPeerTCP.STATUS_CONNECTED:
 			send_command(80, int(player_two_connected))
+			send_command(68, int(mouse_enabled))
 	if not authenticated and Time.get_ticks_msec() >= deadline:
 		report_error("The emulator core connection timed out.")
 		return
@@ -295,10 +332,13 @@ func play_audio(rate: int, start: int, end: int) -> void:
 func send_inputs() -> void:
 	var devices := Input.get_connected_joypads()
 	var focused := get_window().has_focus()
-	var first := read_input(devices[0] if not devices.is_empty() else -1, true) if focused else 0
-	if first != sent_mask:
-		send_command(73, first)
-		sent_mask = first
+	if mouse_enabled:
+		send_mouse_motion()
+	else:
+		var first := read_input(devices[0] if not devices.is_empty() else -1, true) if focused else 0
+		if first != sent_mask:
+			send_command(73, first)
+			sent_mask = first
 	if player_two_connected:
 		var second := read_input(devices[1], false) if focused and devices.size() > 1 else 0
 		if second != sent_second_mask:

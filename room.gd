@@ -109,6 +109,13 @@ var titles := PackedStringArray(SNES_DEMOS)
 var rom_paths := PackedStringArray()
 var emulator := preload("res://emulator/bridge.gd").new()
 var core_picker := OptionButton.new()
+enum PortOne { AUTO, GAMEPAD, MOUSE }
+var port_one_picker := OptionButton.new()
+var port_one_overrides := {}
+var mouse_captured := false
+var mouse_buttons := 0
+const MOUSE_CAPTURE_HINT := "Click the CRT to use the SNES Mouse."
+const MOUSE_RELEASE_HINT := "SNES Mouse active · Esc to return to the room."
 var rom_folder := ""
 var art_folder := ""
 var art_paths: Dictionary[String, String] = {}
@@ -233,6 +240,7 @@ func _ready() -> void:
 	add_child(notebook_button)
 	setup_manual()
 	get_window().mouse_exited.connect(func(): hovered = -1)
+	get_window().focus_exited.connect(release_game_mouse)
 	# Godot's built-in UI actions otherwise also react to SNES gameplay buttons.
 	for action in InputMap.get_actions():
 		if String(action).begins_with("ui_"):
@@ -258,6 +266,7 @@ func _ready() -> void:
 	load_console_library()
 
 func _exit_tree() -> void:
+	release_game_mouse()
 	insert_sound.stop()
 	eject_sound.stop()
 
@@ -283,6 +292,9 @@ func restore_preferences() -> void:
 	preferred_core = clampi(int(config.get_value("emulation", "core", 0)), 0, emulator.CORE_NAMES.size() - 1)
 	shader_preset = clampi(int(config.get_value("emulation", "shader_preset", 1)), 0, 2)
 	scanlines_enabled = bool(config.get_value("emulation", "scanlines", false))
+	var overrides: Variant = config.get_value("emulation", "port_one_overrides", {})
+	if overrides is Dictionary:
+		port_one_overrides = overrides
 
 func save_preferences() -> void:
 	var config := ConfigFile.new()
@@ -297,6 +309,7 @@ func save_preferences() -> void:
 	config.set_value("emulation", "core", preferred_core)
 	config.set_value("emulation", "shader_preset", shader_preset)
 	config.set_value("emulation", "scanlines", scanlines_enabled)
+	config.set_value("emulation", "port_one_overrides", port_one_overrides)
 	if config.save(SETTINGS_PATH) != OK:
 		push_warning("Could not save Bedroom Arcade settings.")
 
@@ -440,8 +453,9 @@ func setup_settings() -> void:
 	emulation_button.text = "Emulation  ›"
 	emulation_button.pressed.connect(func():
 		menu.hide()
+		refresh_port_one_picker()
 		emulation_page.show()
-		settings.popup_centered(Vector2i(344, 450)))
+		settings.popup_centered(Vector2i(344, 520)))
 	menu.add_child(emulation_button)
 
 	var back := Button.new()
@@ -543,6 +557,14 @@ func setup_settings() -> void:
 	add_child(gear)
 
 func add_emulation_controls(page_controls: VBoxContainer) -> void:
+	var port_label := Label.new()
+	port_label.text = "Controller port 1 · Current cartridge"
+	page_controls.add_child(port_label)
+	port_one_picker.name = "PortOneController"
+	for option in ["Auto", "Gamepad", "SNES Mouse"]:
+		port_one_picker.add_item(option)
+	port_one_picker.item_selected.connect(set_port_one_override)
+	page_controls.add_child(port_one_picker)
 	var state_buttons := HBoxContainer.new()
 	state_buttons.add_theme_constant_override("separation", 8)
 	for action in ["Save state", "Load state"]:
@@ -593,7 +615,65 @@ func add_emulation_controls(page_controls: VBoxContainer) -> void:
 		save_preferences())
 	page_controls.add_child(shader_picker)
 
+func port_one_rom() -> String:
+	return rom_paths[inserted] if not megadrive and seated and inserted >= 0 and inserted < rom_paths.size() else ""
+
+func use_snes_mouse(rom: String) -> bool:
+	var choice := int(port_one_overrides.get(rom.sha256_text(), PortOne.AUTO))
+	if choice != PortOne.AUTO:
+		return choice == PortOne.MOUSE
+	return is_mario_paint(rom)
+
+func is_mario_paint(rom: String) -> bool:
+	var stem := rom.get_file().get_basename().to_lower().replace("_", " ").replace("-", " ").strip_edges()
+	return stem == "mario paint" or stem.begins_with("mario paint ")
+
+func refresh_port_one_picker() -> void:
+	var rom := port_one_rom()
+	port_one_picker.disabled = rom.is_empty()
+	port_one_picker.select(clampi(int(port_one_overrides.get(rom.sha256_text(), PortOne.AUTO)), PortOne.AUTO, PortOne.MOUSE))
+	port_one_picker.tooltip_text = "Insert an SNES ROM to choose its controller." if rom.is_empty() else "Auto selects %s for this cartridge." % ("SNES Mouse" if is_mario_paint(rom) else "Gamepad")
+
+func set_port_one_override(index: int) -> void:
+	var rom := port_one_rom()
+	if rom.is_empty():
+		return
+	var key := rom.sha256_text()
+	if index == PortOne.AUTO:
+		port_one_overrides.erase(key)
+	else:
+		port_one_overrides[key] = index
+	save_preferences()
+	if emulator.running:
+		release_game_mouse()
+		var enabled := use_snes_mouse(rom)
+		emulator.set_mouse_device(enabled)
+		message = MOUSE_CAPTURE_HINT if enabled else ""
+		queue_redraw()
+
+func capture_game_mouse() -> void:
+	hide_virtual_pointer()
+	hovered = -1
+	mouse_captured = true
+	mouse_buttons = 0
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	message = MOUSE_RELEASE_HINT
+	queue_redraw()
+
+func release_game_mouse() -> void:
+	if not mouse_captured:
+		return
+	mouse_captured = false
+	mouse_buttons = 0
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	emulator.clear_mouse()
+	if message == MOUSE_RELEASE_HINT:
+		message = MOUSE_CAPTURE_HINT if emulator.mouse_enabled else ""
+	queue_redraw()
+
 func update_crt() -> void:
+	if not emulator.mouse_enabled:
+		release_game_mouse()
 	if crt.texture != emulator.picture:
 		if crt.texture == null and emulator.picture and inserted >= 0 and inserted < rom_paths.size():
 			notebook.record_played(rom_paths[inserted])
@@ -872,6 +952,23 @@ func refresh_alphabet() -> void:
 	alphabet_button.disabled = menu.item_count == 0
 
 func _input(event: InputEvent) -> void:
+	if mouse_captured:
+		if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+			release_game_mouse()
+			get_viewport().set_input_as_handled()
+			return
+		if event is InputEventMouse:
+			if event.device != POINTER_DEVICE:
+				if event is InputEventMouseMotion:
+					emulator.mouse_motion += event.screen_relative
+				elif event is InputEventMouseButton and event.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]:
+					var bit := 1 if event.button_index == MOUSE_BUTTON_LEFT else 2
+					var next_buttons := mouse_buttons | bit if event.pressed else mouse_buttons & ~bit
+					if next_buttons != mouse_buttons:
+						mouse_buttons = next_buttons
+						emulator.set_mouse_buttons(mouse_buttons)
+			get_viewport().set_input_as_handled()
+			return
 	if event is InputEventMouseMotion:
 		if virtual_pointer_active and event.device != POINTER_DEVICE and event.position.distance_to(virtual_position) > 3.0:
 			hide_virtual_pointer()
@@ -906,7 +1003,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventMouseButton:
 		pointer = event.position
 		if event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-			press_at(pointer)
+			if event.device != POINTER_DEVICE and emulator.mouse_enabled and crt.visible and SCREEN.has_point(pointer) and dragging < 0 and not dragging_plug:
+				capture_game_mouse()
+			else:
+				press_at(pointer)
 		elif event.pressed and DESK.has_point(pointer) and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
 			turn_page(1 if event.button_index == MOUSE_BUTTON_WHEEL_DOWN else -1)
 	queue_redraw()
@@ -917,6 +1017,8 @@ func hide_virtual_pointer() -> void:
 		Input.set_custom_mouse_cursor(null)
 
 func update_gamepad_pointer(delta: float) -> void:
+	if mouse_captured:
+		return
 	var pads := Input.get_connected_joypads()
 	if pads.is_empty():
 		if virtual_pointer_active:
@@ -1117,12 +1219,14 @@ func start_cartridge() -> void:
 		preview_started = Time.get_ticks_msec()
 		message = "CRT preview running. Choose a ROM folder to play."
 		return
-	var error: String = emulator.start(rom_paths[inserted], core_picker.selected)
+	var rom := rom_paths[inserted]
+	var enable_mouse := use_snes_mouse(rom)
+	var error: String = emulator.start(rom, core_picker.selected, enable_mouse)
 	if not error.is_empty():
 		show_emulator_error(error)
 		return
 	powered = true
-	message = ""
+	message = MOUSE_CAPTURE_HINT if enable_mouse else ""
 
 func show_emulator_error(error: String) -> void:
 	powered = false
