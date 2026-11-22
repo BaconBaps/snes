@@ -11,6 +11,8 @@ var rgb565 := true
 const LAST_LOG := "user://logs/emulator-last.log"
 const CORE_NAMES := ["Snes9x", "bsnes Balanced"]
 const CORE_FILES := ["snes9x_libretro", "bsnes_mercury_balanced_libretro"]
+const MEGA_DRIVE_CORE_NAME := "Genesis Plus GX"
+const MEGA_DRIVE_CORE_FILE := "genesis_plus_gx_libretro"
 const AUDIO_PREROLL_SECONDS := 0.07
 const HEADER_SIZE := 20
 const MAX_READ_PER_TICK := 2 * 1024 * 1024
@@ -52,12 +54,12 @@ func _ready() -> void:
 	add_child(audio)
 	set_process(false)
 
-func start(rom: String, core_index := 0, use_mouse := false) -> String:
+func start(rom: String, core_index := 0, use_mouse := false, megadrive := false) -> String:
 	if process_id > 0 and OS.is_process_running(process_id):
 		return "The previous game is still closing. Try Reset in a moment."
 	var directory := LocalRuntime.app_path("emulator")
 	var extension := ".dll" if OS.get_name() == "Windows" else ".so"
-	var core := directory.path_join(CORE_FILES[core_index] + extension)
+	var core := directory.path_join((MEGA_DRIVE_CORE_FILE if megadrive else CORE_FILES[core_index]) + extension)
 	if not FileAccess.file_exists(core):
 		return "Add %s to the emulator folder. See README." % core.get_file()
 	var save_dir := ProjectSettings.globalize_path("user://saves")
@@ -70,7 +72,7 @@ func start(rom: String, core_index := 0, use_mouse := false) -> String:
 	var python := LocalRuntime.python_executable()
 	var log_path := ProjectSettings.globalize_path(LAST_LOG)
 	DirAccess.make_dir_recursive_absolute(log_path.get_base_dir())
-	active_core = CORE_NAMES[core_index]
+	active_core = MEGA_DRIVE_CORE_NAME if megadrive else CORE_NAMES[core_index]
 	var arguments := [directory.path_join("host.py"), str(server.get_local_port()),
 		nonce.get_string_from_ascii(), core, rom, save, log_path]
 	if use_mouse:

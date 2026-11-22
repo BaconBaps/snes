@@ -12,7 +12,7 @@ from zipfile import ZipFile
 PROJECT = Path(__file__).resolve().parents[1]
 PYTHON_VERSION = "3.13.12"
 PYTHON_URL = f"https://www.python.org/ftp/python/{PYTHON_VERSION}/python-{PYTHON_VERSION}-embed-amd64.zip"
-CORE_NAMES = ("snes9x_libretro.dll", "bsnes_mercury_balanced_libretro.dll")
+CORE_NAMES = ("snes9x_libretro.dll", "bsnes_mercury_balanced_libretro.dll", "genesis_plus_gx_libretro.dll")
 
 
 def build(godot, core_dir, output):
@@ -62,7 +62,7 @@ def build(godot, core_dir, output):
         if included:
             notice.extend(["", "Included emulator cores: " + ", ".join(included)])
         else:
-            notice.extend(["", "Add a Windows x64 SNES libretro core DLL to the emulator folder for ROM playback."])
+            notice.extend(["", "Add a supported Windows x64 libretro core DLL to the emulator folder for ROM playback."])
             print("No emulator core DLLs found. The package will need a core for ROM playback.", flush=True)
         licenses = {
             "Godot-LICENSE.txt": "https://raw.githubusercontent.com/godotengine/godot/master/LICENSE.txt",
@@ -74,6 +74,9 @@ def build(godot, core_dir, output):
         if CORE_NAMES[1] in included:
             licenses["bsnes-mercury-LICENSE.txt"] = "https://raw.githubusercontent.com/libretro/bsnes-mercury/master/LICENSE"
             notice.append("bsnes-mercury license and source: bsnes-mercury-LICENSE.txt and https://github.com/libretro/bsnes-mercury")
+        if CORE_NAMES[2] in included:
+            licenses["Genesis-Plus-GX-LICENSE.txt"] = "https://raw.githubusercontent.com/libretro/Genesis-Plus-GX/master/LICENSE.txt"
+            notice.append("Genesis Plus GX license and source: Genesis-Plus-GX-LICENSE.txt and https://github.com/libretro/Genesis-Plus-GX")
         for filename, url in licenses.items():
             urlretrieve(url, portable / filename)
         (portable / "Read me.txt").write_text("\n".join(notice) + "\n", encoding="utf-8")

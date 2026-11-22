@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="302" height="159" viewBox="0 0 302 159">
+<svg xmlns="http://www.w3.org/2000/svg" width="347.3" height="159" viewBox="-22.65 0 347.3 159">
   <defs>
     <linearGradient id="case" x2=".22" y2="1" gradientUnits="objectBoundingBox">
       <stop stop-color="#4b4755"/><stop offset=".44" stop-color="#2b2933"/><stop offset="1" stop-color="#1d1b25"/>
@@ -13,11 +13,13 @@
       <stop stop-color="#393642"/><stop offset="1" stop-color="#211e29"/>
     </linearGradient>
   </defs>
-  <path d="M5 120L34 20q3-9 12-9h216q10 0 14 10l20 100 3 18q1 14-16 17H19Q3 155 3 142z" fill="url(#front)" stroke="#15131d" stroke-width="2"/>
-  <path d="M5 120L34 20q3-9 12-9h216q10 0 14 10l20 100q3 13-14 14H20q-16 0-15-15z" fill="url(#case)" stroke="#575162" stroke-width="1.5"/>
-  <path d="M13 113l15-34h63l24 26h130l17-26h25l9 42q2 11-14 12H19q-14 0-11-10z" fill="url(#facet)"/>
+  <g transform="translate(-22.65 0) scale(1.15 1)">
+    <path d="M5 120L34 20q3-9 12-9h216q10 0 14 10l20 100 3 18q1 14-16 17H19Q3 155 3 142z" fill="url(#front)" stroke="#15131d" stroke-width="2"/>
+    <path d="M5 120L34 20q3-9 12-9h216q10 0 14 10l20 100q3 13-14 14H20q-16 0-15-15z" fill="url(#case)" stroke="#575162" stroke-width="1.5"/>
+    <path d="M13 113l15-34h63l24 26h130l17-26h25l9 42q2 11-14 12H19q-14 0-11-10z" fill="url(#facet)"/>
+    <path d="M16 137q2 4 10 4h247q12 0 16-4" fill="none" stroke="#514858" stroke-opacity=".62"/>
+  </g>
   <path d="M34 21l8-7h43L65 71H21z" fill="#24212b" stroke="#16131d"/>
-  <path d="M16 137q2 4 10 4h247q12 0 16-4" fill="none" stroke="#514858" stroke-opacity=".62"/>
   <ellipse cx="185" cy="63" rx="93" ry="61" fill="#16141d"/>
   <ellipse cx="185" cy="58" rx="92" ry="57" fill="url(#disc)" stroke="#56505f" stroke-width="1.5"/>
   <ellipse cx="185" cy="58" rx="81" ry="51" fill="none" stroke="#191720" stroke-width="1.3"/>

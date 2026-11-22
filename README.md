@@ -1,6 +1,6 @@
 # Bedroom Arcade
 
-A Godot 4 Super Nintendo emulator frontend set in a 1990s bedroom. Insert a cartridge to boot the game. The CRT renders the game, **Reset** restarts it in place, and **Eject** turns it off and releases the cartridge.
+A Godot 4 Super Nintendo and Mega Drive emulator frontend set in a 1990s bedroom. Insert a cartridge to boot the game. The CRT renders the game, **Reset** restarts it in place, and **Eject** turns it off and releases the cartridge.
 
 ## Run it on Windows
 
@@ -34,9 +34,13 @@ Click the **Game notes** pad tucked behind the cartridges to search by name or f
 
 To make a custom shoebox, enter a name and click **Create box**. Select a game in the notebook and choose **Add to box**. Use **Move earlier** or **Move later**, or drag a cartridge onto another cartridge in the shoebox to change its place. The notebook remembers favourites, recent games, custom boxes, and their order across launches. Select **All cartridges** to return to the complete ROM library.
 
-## Mega Drive room preview
+## Mega Drive
 
-Choose **Mega Drive** from the console selector in Settings. The preview has its own ROM and cartridge artwork folders and accepts `.md`, `.gen`, `.bin`, and `.smd` files. You can also try the sample cartridges without choosing a folder. Drag a cartridge into the slot to light the power LED, then grab the exposed cartridge and pull it free to power off. Mega Drive gameplay requires future core integration.
+Extract the [Windows x64 Genesis Plus GX core](https://buildbot.libretro.com/nightly/windows/x86_64/latest/genesis_plus_gx_libretro.dll.zip) into `emulator` beside `host.py`. On Linux x86-64, use the [Linux core](https://buildbot.libretro.com/nightly/linux/x86_64/latest/genesis_plus_gx_libretro.so.zip).
+
+Choose **Mega Drive** from the console selector in Settings, then choose a ROM folder containing `.md`, `.gen`, `.bin`, or `.smd` cartridges. The Mega Drive remembers its own ROM and artwork folders. Drag a cartridge into the slot to boot it, click the white **Reset** button to restart, and pull the cartridge free to power off. The sample cartridges still work as a graphical preview without a ROM folder.
+
+The core uses six-button controllers. On a gamepad, the west, south, and east face buttons map to A, B, and C. L1, north, and R1 map to X, Y, and Z. On the keyboard, **A**, **Z**, **X** map to A, B, C, and **Q**, **S**, **W** map to X, Y, Z. Enter is Start and Shift is Mode. Connect the second plug to enable Player 2.
 
 ## Instruction manuals
 

@@ -1,4 +1,4 @@
-"""Run a SNES libretro core and stream frames to the Godot room."""
+"""Run a libretro core and stream frames to the Godot room."""
 
 import ctypes as c
 import faulthandler
@@ -21,6 +21,8 @@ BATCH = c.CFUNCTYPE(SIZE, VOID, SIZE)
 POLL = c.CFUNCTYPE(None)
 INPUT = c.CFUNCTYPE(c.c_int16, UINT, UINT, UINT, UINT)
 LOG = logging.getLogger("emulator")
+# RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_JOYPAD, 1) in Genesis Plus GX.
+MEGA_DRIVE_GAMEPAD = 0x201
 
 
 class CoreVariable(c.Structure):
@@ -48,6 +50,7 @@ class AVInfo(c.Structure):
 class Emulator:
     def __init__(self, core_path, save_path, mouse_enabled=False):
         self.core = c.CDLL(str(core_path))
+        self.gamepad_device = MEGA_DRIVE_GAMEPAD if core_path.stem == "genesis_plus_gx_libretro" else 1
         self.save_path = save_path
         self.state_path = save_path.with_suffix(f".{core_path.stem}.state")
         self.system_dir = os.fsencode(save_path.parent)
@@ -163,13 +166,13 @@ class Emulator:
         self.mouse_enabled = mouse_enabled
         self.buttons[0] = 0
         self.clear_mouse()
-        self.core.retro_set_controller_port_device(0, 2 if mouse_enabled else 1)
+        self.core.retro_set_controller_port_device(0, 2 if mouse_enabled else self.gamepad_device)
         LOG.info("Controller port 1: %s", "SNES Mouse" if mouse_enabled else "Gamepad")
 
     def set_player_two(self, connected):
         self.player_two_connected = connected
         self.buttons[1] = 0
-        self.core.retro_set_controller_port_device(1, int(connected))
+        self.core.retro_set_controller_port_device(1, self.gamepad_device if connected else 0)
 
     def load_save(self):
         size = self.core.retro_get_memory_size(0)

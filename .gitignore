@@ -9,3 +9,6 @@ emulator/bsnes_mercury_balanced_libretro.dll
 emulator/bsnes_mercury_balanced_libretro.so
 
 /dist/
+
+emulator/genesis_plus_gx_libretro.dll
+emulator/genesis_plus_gx_libretro.so
