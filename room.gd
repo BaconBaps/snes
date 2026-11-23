@@ -41,7 +41,7 @@ const MD_RESET := Rect2(318, 550, 34, 12)
 const MD_CART_WIDTH_SCALE := 0.9
 const MD_CART_SIZE := Vector2(160 * MD_CART_WIDTH_SCALE, 73)
 const MD_LABEL := Rect2(24, 11, 112, 55)
-const MD_SEATED_HEIGHT := 69.0
+const MD_SEATED_HEIGHT := MD_CART_SIZE.y * 0.9
 const MD_PORT_ONE := Rect2(422, 592, 33, 9)
 const MD_PORT_TWO := Rect2(472, 592, 33, 9)
 const MD_EXTENSIONS := ["md", "gen", "bin", "smd"]
@@ -1389,11 +1389,20 @@ func draw_megadrive_cartridge(index: int, at: Vector2, height: float) -> void:
 	draw_set_transform(at, 0.0, Vector2(MD_CART_WIDTH_SCALE, 1))
 	if height == MD_CART_SIZE.y:
 		rounded(Rect2(Vector2(3, 5), Vector2(160, height)), 11, "#15111e99")
-	var shell := PackedVector2Array([Vector2(0, 11), Vector2(6, 8), Vector2(154, 8), Vector2(160, 11),
-		Vector2(154, height - 7), Vector2(147, height), Vector2(13, height), Vector2(6, height - 7)])
+	var shell := PackedVector2Array([Vector2(0, 11), Vector2(6, 8), Vector2(154, 8), Vector2(160, 11)])
+	var corner_y := MD_CART_SIZE.y - 7.0
+	if height < corner_y:
+		var inset := 6.0 * (height - 11.0) / (corner_y - 11.0)
+		shell.append_array(PackedVector2Array([Vector2(160 - inset, height), Vector2(inset, height)]))
+	else:
+		shell.append_array(PackedVector2Array([Vector2(154, corner_y), Vector2(147, height),
+			Vector2(13, height), Vector2(6, corner_y)]))
 	var top := Color("#383440")
 	var bottom := Color("#1b1823")
-	draw_polygon(shell, PackedColorArray([top, top, top, top, bottom, bottom, bottom, bottom]))
+	var shell_colors := PackedColorArray([top, top, top, top])
+	for vertex in range(4, shell.size()):
+		shell_colors.append(bottom)
+	draw_polygon(shell, shell_colors)
 	shape([Vector2(0, 11), Vector2(3, 5), Vector2(10, 1), Vector2(150, 1),
 		Vector2(157, 5), Vector2(160, 11)], "#3e3948")
 	line(Vector2(11, 2), Vector2(149, 2), "#77707f")
@@ -1414,11 +1423,14 @@ func draw_megadrive_cartridge(index: int, at: Vector2, height: float) -> void:
 	draw_string(ThemeDB.fallback_font, Vector2.ZERO, cartridge_display_title(title),
 		HORIZONTAL_ALIGNMENT_CENTER, 204, 7, ink)
 	draw_set_transform(at, 0.0, shell_scale)
-	rounded(MD_LABEL.grow(0.8), 4, "#14121b", "#5e5260")
+	var visible_face := Rect2(0, 0, 160, height)
+	var label := MD_LABEL.intersection(visible_face)
+	rounded(MD_LABEL.grow(0.8).intersection(visible_face), 4, "#14121b", "#5e5260")
 	if art:
-		draw_texture_rect(art, MD_LABEL, false)
+		var source_size := art.get_size() * label.size / MD_LABEL.size
+		draw_texture_rect_region(art, label, Rect2(Vector2.ZERO, source_size))
 	else:
-		rounded(MD_LABEL, 3, accent)
+		rounded(label, 3, accent)
 		line(Vector2(30, 22), Vector2(75, 22), "#e6b995", 2)
 		words(titles[index], 31, 45, 11, 98)
 		words("MEGA DRIVE", 31, 61, 7, 96)
