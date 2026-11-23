@@ -184,6 +184,8 @@ var input_static_timer := Timer.new()
 var input_hiss := AudioStreamPlayer.new()
 var room_dimmer := ColorRect.new()
 var room_overlay := Node2D.new()
+var dragged_prop_layer := Node2D.new()
+var prop_canvas: CanvasItem = self
 var ceiling_light_on := true
 var screen_spill := ColorRect.new()
 var screen_light := Color.BLACK
@@ -229,6 +231,8 @@ func _ready() -> void:
 	crt_glass.size = SCREEN.size
 	crt_glass.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(crt_glass)
+	dragged_prop_layer.draw.connect(draw_dragged_prop)
+	add_child(dragged_prop_layer)
 	room_overlay.draw.connect(draw_room_overlay)
 	add_child(room_overlay)
 	update_glass_sheen()
@@ -812,6 +816,8 @@ func update_crt() -> void:
 		crt.material.set_shader_parameter("rgb565", emulator.rgb565)
 
 func update_glass_sheen() -> void:
+	var dim_tint := Color.WHITE.lerp(room_dimmer.color, room_dimmer.color.a)
+	dragged_prop_layer.self_modulate = Color.WHITE if ceiling_light_on else Color(dim_tint, 1.0)
 	crt_static.material.set_shader_parameter("brightness", 1.0 if ceiling_light_on else 0.54)
 	var strength := 0.43 if crt.visible else 1.0
 	if not ceiling_light_on and not crt.visible:
@@ -1402,27 +1408,27 @@ func _process(delta: float) -> void:
 		queue_redraw()
 
 func box(x: float, y: float, width: float, height: float, color: String) -> void:
-	draw_rect(Rect2(x, y, width, height), Color(color))
+	prop_canvas.draw_rect(Rect2(x, y, width, height), Color(color))
 
 func words(value: String, x: float, y: float, size: int, width := -1) -> void:
-	draw_string(ThemeDB.fallback_font, Vector2(x, y), value, HORIZONTAL_ALIGNMENT_LEFT, width, size, Color("#f9e4c5"))
+	prop_canvas.draw_string(ThemeDB.fallback_font, Vector2(x, y), value, HORIZONTAL_ALIGNMENT_LEFT, width, size, Color("#f9e4c5"))
 
 func gradient(rect: Rect2, top: String, bottom: String) -> void:
 	var points := PackedVector2Array([rect.position, Vector2(rect.end.x, rect.position.y),
 		rect.end, Vector2(rect.position.x, rect.end.y)])
-	draw_polygon(points, PackedColorArray([Color(top), Color(top), Color(bottom), Color(bottom)]))
+	prop_canvas.draw_polygon(points, PackedColorArray([Color(top), Color(top), Color(bottom), Color(bottom)]))
 
 func shape(points: PackedVector2Array, color: String) -> void:
-	draw_colored_polygon(points, Color(color))
+	prop_canvas.draw_colored_polygon(points, Color(color))
 
-func rounded(rect: Rect2, radius: int, fill: String, border: String = "", canvas: CanvasItem = self) -> void:
+func rounded(rect: Rect2, radius: int, fill: String, border: String = "", canvas: CanvasItem = null) -> void:
 	var style := StyleBoxFlat.new()
 	style.set_corner_radius_all(radius)
 	style.bg_color = Color(fill)
 	if not border.is_empty():
 		style.border_color = Color(border)
 		style.set_border_width_all(1)
-	canvas.draw_style_box(style, rect)
+	(canvas if canvas else prop_canvas).draw_style_box(style, rect)
 
 func glow(center: Vector2, size: Vector2, tint: Color, canvas: CanvasItem = self) -> void:
 	var points := PackedVector2Array([center])
@@ -1438,7 +1444,7 @@ func glow(center: Vector2, size: Vector2, tint: Color, canvas: CanvasItem = self
 			PackedColorArray([colors[0], colors[step], colors[step + 1]]))
 
 func line(from: Vector2, to: Vector2, color: String, width: float = 1.0) -> void:
-	draw_line(from, to, Color(color), width, true)
+	prop_canvas.draw_line(from, to, Color(color), width, true)
 
 func uses_black_shell(title: String) -> bool:
 	return title.to_lower().replace("_", " ").strip_edges().begins_with("killer instinct")
@@ -1469,7 +1475,7 @@ func cartridge(index: int, at: Vector2, visible_height := -1.0) -> void:
 		Vector2(6, visible_height), Vector2(2, visible_height - 4)])
 	var top := Color("#24232a" if black_shell else "#c6c0c3")
 	var bottom := Color("#15141a" if black_shell else "#9e98a2")
-	draw_polygon(body, PackedColorArray([top, top, bottom, bottom, bottom, bottom]))
+	prop_canvas.draw_polygon(body, PackedColorArray([top, top, bottom, bottom, bottom, bottom]))
 	line(Vector2(1, 7), Vector2(width - 1, 7), "#4e4b54" if black_shell else "#f2e9e0")
 	line(Vector2(2, 10), Vector2(4, visible_height - 5), "#3c3941" if black_shell else "#ddd5d4")
 	line(Vector2(width - 2, 10), Vector2(width - 4, visible_height - 5), "#111015" if black_shell else "#807985")
@@ -1482,10 +1488,10 @@ func cartridge(index: int, at: Vector2, visible_height := -1.0) -> void:
 	var art := cartridge_label_texture(index)
 	if art:
 		rounded(label, LABEL_RADIUS, "#36313b")
-		draw_texture_rect(art, label, false)
+		prop_canvas.draw_texture_rect(art, label, false)
 	else:
 		rounded(label, LABEL_RADIUS, LABEL_COLORS[index % LABEL_COLORS.size()])
-		draw_circle(Vector2(width - 23, 18), 8, Color("#ffcf913c"), true, -1, true)
+		prop_canvas.draw_circle(Vector2(width - 23, 18), 8, Color("#ffcf913c"), true, -1, true)
 		line(Vector2(13, 17), Vector2(53, 17), "#f8c992", 2)
 		words(titles[index], 13, 39, 11, int(width) - 26)
 
@@ -1500,7 +1506,7 @@ func cartridge(index: int, at: Vector2, visible_height := -1.0) -> void:
 	var screw_y := CART_SIZE.y - 13.0
 	if visible_height >= screw_y + 3.0:
 		for x in [11.0, width - 11.0]:
-			draw_circle(Vector2(x, screw_y), 2.5, Color("#101014" if black_shell else "#665e6a"), true, -1, true)
+			prop_canvas.draw_circle(Vector2(x, screw_y), 2.5, Color("#101014" if black_shell else "#665e6a"), true, -1, true)
 			line(Vector2(x - 1, screw_y), Vector2(x + 1, screw_y), "#37343d" if black_shell else "#b5a9b2")
 	set_prop_transform(Vector2.ZERO)
 
@@ -1528,7 +1534,7 @@ func draw_megadrive_cartridge(index: int, at: Vector2, height: float) -> void:
 	var shell_colors := PackedColorArray([top, top, top, top])
 	for vertex in range(4, shell.size()):
 		shell_colors.append(bottom)
-	draw_polygon(shell, shell_colors)
+	prop_canvas.draw_polygon(shell, shell_colors)
 	shape([Vector2(0, 11), Vector2(3, 5), Vector2(10, 1), Vector2(150, 1),
 		Vector2(157, 5), Vector2(160, 11)], "#3e3948")
 	line(Vector2(11, 2), Vector2(149, 2), "#77707f")
@@ -1546,7 +1552,7 @@ func draw_megadrive_cartridge(index: int, at: Vector2, height: float) -> void:
 	var shell_scale := Vector2(MD_CART_WIDTH_SCALE, 1)
 	var text_baseline := Vector2(29, 8.25) * shell_scale
 	set_prop_transform(at + text_baseline, 0.0, shell_scale * 0.5)
-	draw_string(ThemeDB.fallback_font, Vector2.ZERO, cartridge_display_title(title),
+	prop_canvas.draw_string(ThemeDB.fallback_font, Vector2.ZERO, cartridge_display_title(title),
 		HORIZONTAL_ALIGNMENT_CENTER, 204, 7, ink)
 	set_prop_transform(at, 0.0, shell_scale)
 	var visible_face := Rect2(0, 0, 160, height)
@@ -1554,7 +1560,7 @@ func draw_megadrive_cartridge(index: int, at: Vector2, height: float) -> void:
 	rounded(MD_LABEL.grow(0.8).intersection(visible_face), 4, "#14121b", "#5e5260")
 	if art:
 		var source_size := art.get_size() * label.size / MD_LABEL.size
-		draw_texture_rect_region(art, label, Rect2(Vector2.ZERO, source_size))
+		prop_canvas.draw_texture_rect_region(art, label, Rect2(Vector2.ZERO, source_size))
 	else:
 		rounded(label, 3, accent)
 		line(Vector2(30, 22), Vector2(75, 22), "#e6b995", 2)
@@ -1980,7 +1986,8 @@ func draw_controller_plugs() -> void:
 		rounded(player_two_socket().grow(4), 5, "#a47b62", "#ffd7aa")
 	var cable_exit_y := get_viewport_rect().end.y + 6.0
 	draw_controller_plug(first, Vector2(438 if megadrive else 379, cable_exit_y))
-	draw_controller_plug(second, Vector2(SECOND_CABLE_EXIT_X, cable_exit_y))
+	if not dragging_plug:
+		draw_controller_plug(second, Vector2(SECOND_CABLE_EXIT_X, cable_exit_y))
 
 func draw_controller_plug(at: Vector2, cable_end: Vector2) -> void:
 	var start := at + Vector2(PLUG_SIZE.x / 2.0, PLUG_SIZE.y - 1.0)
@@ -1991,8 +1998,8 @@ func draw_controller_plug(at: Vector2, cable_end: Vector2) -> void:
 		points.append(start.bezier_interpolate(start + Vector2(0, bend_height * 0.55),
 			exit_bend - Vector2(0, bend_height * 0.3), exit_bend, index / 32.0))
 	points.append(cable_end)
-	draw_polyline(points, Color("#292633"), 5.0, true)
-	draw_polyline(points, Color("#746e7a"), 2.0, true)
+	prop_canvas.draw_polyline(points, Color("#292633"), 5.0, true)
+	prop_canvas.draw_polyline(points, Color("#746e7a"), 2.0, true)
 	rounded(Rect2(at + Vector2(2, 3), PLUG_SIZE), 4, "#29263388")
 	rounded(Rect2(at, PLUG_SIZE), 4, "#302b38" if megadrive else "#676271", "#696070" if megadrive else "#a49ba5")
 	line(at + Vector2(7, 5), at + Vector2(34, 5), "#625869" if megadrive else "#a198a6")
@@ -2018,7 +2025,7 @@ func draw_console_caption(label: String, baseline: Vector2, width: float, size: 
 	set_prop_matrix(CONSOLE_TRANSFORM)
 
 func set_prop_transform(origin: Vector2, rotation := 0.0, scale := Vector2.ONE) -> void:
-	draw_set_transform(origin + prop_draw_offset, rotation, scale)
+	prop_canvas.draw_set_transform(origin + prop_draw_offset, rotation, scale)
 
 func set_prop_matrix(matrix: Transform2D) -> void:
 	draw_set_transform_matrix(matrix.translated(prop_draw_offset))
@@ -2050,9 +2057,17 @@ func _draw() -> void:
 	draw_shoebox_front()
 	prop_draw_offset = Vector2.ZERO
 	set_prop_transform(Vector2.ZERO)
+	dragged_prop_layer.queue_redraw()
+	room_overlay.queue_redraw()
+
+func draw_dragged_prop() -> void:
+	prop_canvas = dragged_prop_layer
+	if dragging_plug:
+		var cable_end := Vector2(SECOND_CABLE_EXIT_X, get_viewport_rect().end.y + 6.0)
+		draw_controller_plug(player_two_plug_position(), cable_end)
 	if dragging >= 0 and not (megadrive and seated and dragging == inserted):
 		cartridge(dragging, dragged_cartridge_position(pointer))
-	room_overlay.queue_redraw()
+	prop_canvas = self
 
 func draw_room_overlay() -> void:
 	var font := ThemeDB.fallback_font
