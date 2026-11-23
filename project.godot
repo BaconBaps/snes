@@ -1,7 +1,9 @@
 config_version=5
 
 [application]
-config/name="Bedroom Arcade"
+config/name="Bedroom Gaming Emulator"
+config/use_custom_user_dir=true
+config/custom_user_dir_name="godot/app_userdata/Bedroom Arcade"
 run/main_scene="res://room.tscn"
 
 [display]

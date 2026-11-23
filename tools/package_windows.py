@@ -20,7 +20,7 @@ def build(godot, core_dir, output):
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="bedroom-arcade-") as temporary:
         work = Path(temporary)
-        portable = work / "Bedroom Arcade"
+        portable = work / "Bedroom Gaming Emulator"
         portable.mkdir()
         runtime = portable / "runtime"
         runtime.mkdir()
@@ -50,8 +50,8 @@ def build(godot, core_dir, output):
                 included.append(name)
 
         notice = [
-            "Bedroom Arcade portable build", "",
-            "Open Bedroom Arcade.exe from this extracted folder. Keep the runtime,",
+            "Bedroom Gaming Emulator portable build", "",
+            "Open Bedroom Gaming Emulator.exe from this extracted folder. Keep the runtime,",
             "emulator, and manuals folders beside it. Python and PDF support are included.",
             "Choose your own ROM folder. Place a matching PDF beside the ROM or in its manuals subfolder.",
             "", "Bundled third-party components",
@@ -84,12 +84,12 @@ def build(godot, core_dir, output):
         subprocess.run([godot, "--headless", "--path", str(PROJECT), "--editor", "--import"], check=True)
         subprocess.run([
             godot, "--headless", "--path", str(PROJECT), "--export-release",
-            "Windows Portable", str(portable / "Bedroom Arcade.exe"),
+            "Windows Portable", str(portable / "Bedroom Gaming Emulator.exe"),
         ], check=True)
-        if not (portable / "Bedroom Arcade.exe").is_file():
+        if not (portable / "Bedroom Gaming Emulator.exe").is_file():
             raise RuntimeError("Godot did not create the Windows executable. Check the export templates.")
 
-        result = shutil.make_archive(str(work / "Bedroom-Arcade-Windows"), "zip", work, portable.name)
+        result = shutil.make_archive(str(work / "Bedroom-Gaming-Emulator-Windows"), "zip", work, portable.name)
         shutil.copy2(result, output)
     print(f"Portable Windows package: {output}")
 
@@ -98,7 +98,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--godot", default="godot", help="Path to a Godot 4 executable")
     parser.add_argument("--core-dir", type=Path, default=PROJECT / "emulator", help="Optional x64 Windows core DLL directory")
-    parser.add_argument("--output", type=Path, default=PROJECT / "dist" / "Bedroom-Arcade-Windows.zip")
+    parser.add_argument("--output", type=Path, default=PROJECT / "dist" / "Bedroom-Gaming-Emulator-Windows.zip")
     args = parser.parse_args()
     build(args.godot, args.core_dir, args.output)
 

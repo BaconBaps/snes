@@ -251,10 +251,12 @@ class Emulator:
         sample_start = deadline
         frame_count = 0
         sent_first_picture = False
+        paused = False
         core_seconds = 0.0
         send_seconds = 0.0
         while True:
-            ready, _, _ = select.select([connection], [], [], max(0, deadline - time.monotonic()))
+            timeout = None if paused else max(0, deadline - time.monotonic())
+            ready, _, _ = select.select([connection], [], [], timeout)
             if ready:
                 incoming = connection.recv(1024)
                 if not incoming:
@@ -265,7 +267,15 @@ class Emulator:
                     del commands[:3]
                     if command == ord("Q"):
                         return
-                    if command == ord("R"):
+                    if command == ord("U"):
+                        paused = bool(mask)
+                        self.buttons[:] = [0, 0]
+                        self.clear_mouse()
+                        if not paused:
+                            deadline = sample_start = time.monotonic()
+                            frame_count = 0
+                            core_seconds = send_seconds = 0.0
+                    elif command == ord("R"):
                         self.core.retro_reset()
                     elif command in (ord("S"), ord("L")):
                         message = self.state_command(command == ord("S")).encode("utf-8")
@@ -288,7 +298,7 @@ class Emulator:
                         self.buttons[0] = mask
                     elif command == ord("J") and self.player_two_connected:
                         self.buttons[1] = mask
-                if time.monotonic() < deadline:
+                if paused or time.monotonic() < deadline:
                     continue
             self.audio.clear()
             self.video = b""

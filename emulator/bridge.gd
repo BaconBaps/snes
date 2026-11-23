@@ -9,6 +9,7 @@ signal state_result(message: String)
 var rgb565 := true
 
 const LAST_LOG := "user://logs/emulator-last.log"
+const MEGA_DRIVE_LOG := "user://logs/megadrive-last.log"
 const CORE_NAMES := ["Snes9x", "bsnes Balanced"]
 const CORE_FILES := ["snes9x_libretro", "bsnes_mercury_balanced_libretro"]
 const MEGA_DRIVE_CORE_NAME := "Genesis Plus GX"
@@ -26,6 +27,7 @@ var picture: ImageTexture
 var screen_light := Color.BLACK
 var light_sample_at := 0
 var running := false
+var paused := false
 
 var server := TCPServer.new()
 var peer: StreamPeerTCP
@@ -70,7 +72,7 @@ func start(rom: String, core_index := 0, use_mouse := false, megadrive := false)
 		return "Could not open a local connection to the emulator core."
 	nonce = Crypto.new().generate_random_bytes(16).hex_encode().to_ascii_buffer()
 	var python := LocalRuntime.python_executable()
-	var log_path := ProjectSettings.globalize_path(LAST_LOG)
+	var log_path := ProjectSettings.globalize_path(MEGA_DRIVE_LOG if megadrive else LAST_LOG)
 	DirAccess.make_dir_recursive_absolute(log_path.get_base_dir())
 	active_core = MEGA_DRIVE_CORE_NAME if megadrive else CORE_NAMES[core_index]
 	var arguments := [directory.path_join("host.py"), str(server.get_local_port()),
@@ -82,6 +84,7 @@ func start(rom: String, core_index := 0, use_mouse := false, megadrive := false)
 		server.stop()
 		return "Could not start Python. See README for setup."
 	running = true
+	paused = false
 	mouse_enabled = use_mouse
 	mouse_motion = Vector2.ZERO
 	authenticated = false
@@ -106,16 +109,38 @@ func stop() -> void:
 		peer.disconnect_from_host()
 		peer = null
 	server.stop()
+	authenticated = false
+	paused = false
 	incoming.clear()
 	picture = null
 	screen_light = Color.BLACK
 	light_sample_at = 0
 	frame_changed.emit()
-	audio.stop()
-	playback = null
-	audio_preroll.clear()
+	clear_audio()
 	running = false
 	set_process(false)
+
+func set_paused(value: bool) -> void:
+	if not running or paused == value:
+		return
+	paused = value
+	mouse_motion = Vector2.ZERO
+	sent_mask = -1
+	sent_second_mask = -1
+	clear_audio()
+	received_frames = 0
+	displayed_frames = 0
+	previous_audio_skips = 0
+	stats = ""
+	frame_stats_started = Time.get_ticks_msec()
+	if authenticated and peer.get_status() == StreamPeerTCP.STATUS_CONNECTED:
+		send_command(85, int(paused)) # U: pause or resume the core
+
+func clear_audio() -> void:
+	audio.stop()
+	audio.stream = null
+	playback = null
+	audio_preroll.clear()
 
 func reset() -> void:
 	if authenticated:
@@ -195,6 +220,8 @@ func _process(_delta: float) -> void:
 		if peer.get_status() == StreamPeerTCP.STATUS_CONNECTED:
 			send_command(80, int(player_two_connected))
 			send_command(68, int(mouse_enabled))
+			if paused:
+				send_command(85, 1)
 	if not authenticated and Time.get_ticks_msec() >= deadline:
 		report_error("The emulator core connection timed out.")
 		return
@@ -206,7 +233,7 @@ func _process(_delta: float) -> void:
 		var phase := "during startup" if picture == null else "during playback"
 		report_error("%s stopped %s. See the emulator log in Settings → Emulation." % [active_core, phase])
 		return
-	if authenticated:
+	if authenticated and not paused:
 		update_stats()
 		send_inputs()
 
@@ -255,7 +282,7 @@ func read_frames() -> void:
 			latest_width = width
 			latest_height = height
 			latest_rgb565 = kind == 2
-		if rate > 0 and payload_size > 0:
+		if not paused and rate > 0 and payload_size > 0:
 			play_audio(rate, video_end, end)
 		offset = end
 	# Keep all audio, but upload only the newest complete video frame.

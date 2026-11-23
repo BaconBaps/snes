@@ -116,7 +116,10 @@ var cart_grab_offset := Vector2.ZERO
 var pull_origin := Vector2.ZERO
 var titles := PackedStringArray(SNES_DEMOS)
 var rom_paths := PackedStringArray()
-var emulator := preload("res://emulator/bridge.gd").new()
+const EmulatorBridge := preload("res://emulator/bridge.gd")
+var console_emulators: Array[EmulatorBridge] = [EmulatorBridge.new(), EmulatorBridge.new()]
+var cartridge_sessions: Array[Dictionary] = [{}, {}]
+var emulator: EmulatorBridge = console_emulators[0]
 var core_picker := OptionButton.new()
 enum PortOne { AUTO, GAMEPAD, MOUSE }
 var port_one_picker := OptionButton.new()
@@ -228,9 +231,19 @@ func _ready() -> void:
 	room_overlay.draw.connect(draw_room_overlay)
 	add_child(room_overlay)
 	update_glass_sheen()
-	add_child(emulator)
-	emulator.frame_changed.connect(update_crt)
-	emulator.failed.connect(show_emulator_error)
+	emulator = console_emulators[int(megadrive)]
+	for index in range(console_emulators.size()):
+		var bridge = console_emulators[index]
+		add_child(bridge)
+		bridge.frame_changed.connect(func():
+			if bridge == emulator:
+				update_crt())
+		bridge.failed.connect(func(error: String):
+			if bridge == emulator:
+				show_emulator_error(error)
+			else:
+				cartridge_sessions[index]["powered"] = false
+				cartridge_sessions[index]["message"] = error)
 
 	setup_tv_inputs()
 	setup_settings()
@@ -324,7 +337,7 @@ func save_preferences() -> void:
 	config.set_value("emulation", "scanlines", scanlines_enabled)
 	config.set_value("emulation", "port_one_overrides", port_one_overrides)
 	if config.save(SETTINGS_PATH) != OK:
-		push_warning("Could not save Bedroom Arcade settings.")
+		push_warning("Could not save Bedroom Gaming Emulator settings.")
 
 func library_folder(for_megadrive: bool, artwork := false) -> String:
 	if for_megadrive == megadrive:
@@ -333,14 +346,14 @@ func library_folder(for_megadrive: bool, artwork := false) -> String:
 		return md_art_folder if artwork else md_rom_folder
 	return snes_art_folder if artwork else snes_rom_folder
 
-func load_console_library() -> void:
+func load_console_library(keep_session := false) -> void:
 	rom_folder = md_rom_folder if megadrive else snes_rom_folder
 	art_folder = md_art_folder if megadrive else snes_art_folder
 	rom_paths.clear()
 	titles = PackedStringArray(MD_DEMOS if megadrive else SNES_DEMOS)
 	refresh_label_art()
 	if not rom_folder.is_empty():
-		load_folder(rom_folder)
+		load_folder(rom_folder, keep_session)
 	else:
 		refresh_shoebox()
 		message = "Drag a cartridge into the console slot."
@@ -354,7 +367,13 @@ func switch_console(index: int) -> void:
 	else:
 		snes_rom_folder = rom_folder
 		snes_art_folder = art_folder
-	emulator.stop()
+	release_game_mouse()
+	emulator.set_paused(true)
+	cartridge_sessions[int(megadrive)] = {
+		"rom": rom_paths[inserted] if inserted >= 0 and inserted < rom_paths.size() else "",
+		"inserted": inserted, "seated": seated, "powered": powered, "lift": lift,
+		"page": page, "message": message, "preview_elapsed": Time.get_ticks_msec() - preview_started,
+	}
 	manual.set_rom("")
 	inserted = -1
 	dragging = -1
@@ -363,7 +382,29 @@ func switch_console(index: int) -> void:
 	powered = false
 	reset_lift()
 	megadrive = index == 1
-	load_console_library()
+	emulator = console_emulators[index]
+	load_console_library(true)
+	var session := cartridge_sessions[index]
+	if not session.is_empty():
+		var rom: String = session.rom
+		inserted = rom_paths.find(rom) if not rom.is_empty() else session.inserted
+		if inserted >= 0 and inserted < titles.size():
+			seated = session.seated
+			powered = session.powered
+			lift = session.lift
+			message = session.message
+			preview_started = Time.get_ticks_msec() - int(session.preview_elapsed)
+			if seated and not rom.is_empty():
+				manual.set_rom(rom)
+		else:
+			inserted = -1
+			emulator.stop()
+		page = mini(int(session.page), page_count() - 1)
+		update_page_controls()
+	screen_light = Color.BLACK
+	update_crt()
+	if not console_transition:
+		emulator.set_paused(false)
 	save_preferences()
 	console_changed.emit()
 
@@ -378,7 +419,9 @@ func request_console_switch(index: int) -> void:
 	console_transition.tween_method(update_console_slide, 0.0, 1.0, 0.36)
 	console_transition.tween_callback(switch_console.bind(index))
 	console_transition.tween_method(update_console_slide, 1.0, 0.0, 0.40)
-	console_transition.finished.connect(func(): console_transition = null)
+	console_transition.finished.connect(func():
+		console_transition = null
+		emulator.set_paused(false))
 
 func update_console_slide(progress: float) -> void:
 	left_slide = Vector2(-760.0 * progress, 0)
@@ -619,14 +662,18 @@ func add_emulation_controls(page_controls: VBoxContainer) -> void:
 	var state_status := Label.new()
 	state_status.text = "One state per game and core"
 	state_status.add_theme_font_size_override("font_size", 13)
-	emulator.state_result.connect(func(result: String): state_status.text = result)
+	for bridge in console_emulators:
+		bridge.state_result.connect(func(result: String):
+			if bridge == emulator:
+				state_status.text = result)
 	page_controls.add_child(state_status)
 
 	var log_button := Button.new()
 	log_button.text = "Open last emulator log"
 	log_button.pressed.connect(func():
-		if FileAccess.file_exists(emulator.LAST_LOG):
-			if OS.shell_open(ProjectSettings.globalize_path(emulator.LAST_LOG)) != OK:
+		var path: String = emulator.MEGA_DRIVE_LOG if megadrive else emulator.LAST_LOG
+		if FileAccess.file_exists(path):
+			if OS.shell_open(ProjectSettings.globalize_path(path)) != OK:
 				state_status.text = "Could not open the emulator log."
 		else:
 			state_status.text = "No emulator log yet. Insert a ROM first.")
@@ -729,7 +776,7 @@ func update_glass_sheen() -> void:
 		strength *= 0.22
 	crt_glass.material.set_shader_parameter("sheen_strength", strength)
 
-func load_folder(path: String) -> void:
+func load_folder(path: String, keep_session := false) -> void:
 	var folder := DirAccess.open(path)
 	if folder == null:
 		message = "That folder could not be opened."
@@ -738,7 +785,8 @@ func load_folder(path: String) -> void:
 	if path != rom_folder:
 		rom_folder = path
 		save_preferences()
-	emulator.stop()
+	if not keep_session:
+		emulator.stop()
 	manual.set_rom("")
 	titles.clear()
 	rom_paths.clear()

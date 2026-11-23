@@ -1,4 +1,4 @@
-# Bedroom Arcade
+# Bedroom Gaming Emulator
 
 A Godot 4 Super Nintendo and Mega Drive emulator frontend set in a 1990s bedroom. Insert a cartridge to boot the game. The CRT renders the game, **Reset** restarts it in place, and **Eject** turns it off and releases the cartridge.
 
@@ -24,9 +24,9 @@ Install the export templates matching your Godot 4 editor (**Editor → Manage E
 python tools/package_windows.py --godot "C:\path\to\Godot.exe"
 ```
 
-The output is `dist/Bedroom-Arcade-Windows.zip`. The builder packages an x64 executable, an embedded Python runtime, the PDF renderer, and any supported Windows core DLLs that you have placed in `emulator`. You can point it to a different DLL folder with `--core-dir`. Check the core's redistribution terms before sharing its binary. ROMs and manuals stay in the recipient's own library.
+The output is `dist/Bedroom-Gaming-Emulator-Windows.zip`. The builder packages an x64 executable, an embedded Python runtime, the PDF renderer, and any supported Windows core DLLs that you have placed in `emulator`. You can point it to a different DLL folder with `--core-dir`. Check the core's redistribution terms before sharing its binary. ROMs and manuals stay in the recipient's own library.
 
-Recipients extract the ZIP and open **Bedroom Arcade.exe**. Keep the adjacent folders with the executable. They do not need Godot, Python, pip, or a separate PDF viewer.
+Recipients extract the ZIP and open **Bedroom Gaming Emulator.exe**. Keep the adjacent folders with the executable. They do not need Godot, Python, pip, or a separate PDF viewer.
 
 ## Cartridge notebook and shoeboxes
 
@@ -38,7 +38,7 @@ To make a custom shoebox, enter a name and click **Create box**. Select a game i
 
 Extract the [Windows x64 Genesis Plus GX core](https://buildbot.libretro.com/nightly/windows/x86_64/latest/genesis_plus_gx_libretro.dll.zip) into `emulator` beside `host.py`. On Linux x86-64, use the [Linux core](https://buildbot.libretro.com/nightly/linux/x86_64/latest/genesis_plus_gx_libretro.so.zip).
 
-Press **MEGA DRIVE** on the TV or choose it in Settings, then choose a ROM folder containing `.md`, `.gen`, `.bin`, or `.smd` cartridges. The Mega Drive remembers its own ROM and artwork folders. Use the **SNES** and **MEGA DRIVE** buttons on the TV to switch inputs. Switching stops the active game as the console and shoebox slide away. Drag a cartridge into the slot to boot it, click the white **Reset** button to restart, and pull the cartridge free to power off. The sample cartridges still work as a graphical preview without a ROM folder.
+Press **MEGA DRIVE** on the TV or choose it in Settings, then choose a ROM folder containing `.md`, `.gen`, `.bin`, or `.smd` cartridges. The Mega Drive remembers its own ROM and artwork folders. Use the **SNES** and **MEGA DRIVE** buttons on the TV to switch inputs. Switching pauses the outgoing game and resumes the incoming game when its console finishes sliding in. Both cartridges stay where you left them until you close the app. Drag a cartridge into the slot to boot it, click the white **Reset** button to restart, and pull the cartridge free to power off. The sample cartridges still work as a graphical preview without a ROM folder.
 
 The core uses six-button controllers. On a gamepad, the west, south, and east face buttons map to A, B, and C. L1, north, and R1 map to X, Y, and Z. On the keyboard, **A**, **Z**, **X** map to A, B, C, and **Q**, **S**, **W** map to X, Y, Z. Enter is Start and Shift is Mode. Connect the second plug to enable Player 2.
 
