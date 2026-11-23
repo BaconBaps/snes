@@ -20,7 +20,6 @@ const LOOSE_PLUG := Vector2(611, 556)
 const SECOND_CABLE_EXIT_X := 729.0
 const DESK := Rect2(770, 252, 354, 308)
 const CEILING_LIGHT := Rect2(970, 60, 126, 62)
-enum Television { ORIGINAL, GRAPHITE, SILVER }
 
 const POSTER_RECTS := [Rect2(736, 58, 91, 112), Rect2(855, 29, 101, 62),
 	Rect2(866, 110, 96, 86), Rect2(1046, 132, 67, 73)]
@@ -112,6 +111,9 @@ var snes_rom_folder := ""
 var snes_art_folder := ""
 var md_rom_folder := ""
 var md_art_folder := ""
+var manual_folders := PackedStringArray(["", ""])
+var setup_complete := false
+var first_run := preload("res://setup/first_run.gd").new()
 var cart_grab_offset := Vector2.ZERO
 var pull_origin := Vector2.ZERO
 var titles := PackedStringArray(SNES_DEMOS)
@@ -135,7 +137,6 @@ var sidecar_paths: Dictionary[String, String] = {}
 var label_textures: Dictionary[String, Texture2D] = {}
 var title_tags := RegEx.create_from_string(r"\([^()\[\]]*\)|\[[^()\[\]]*\]")
 var end_label_palettes: Dictionary[String, PackedColorArray] = {}
-var shader_preset := 1
 var preferred_core := 0
 var preview_started := 0
 var inserted := -1
@@ -180,15 +181,12 @@ var crt_glass := ColorRect.new()
 var room_dimmer := ColorRect.new()
 var room_overlay := Node2D.new()
 var ceiling_light_on := true
-var television := Television.ORIGINAL
-var scanlines_enabled := false
 var screen_spill := ColorRect.new()
 var screen_light := Color.BLACK
 var last_insert := -1
 var last_eject := -1
 var insert_sound := AudioStreamPlayer.new()
 var eject_sound := AudioStreamPlayer.new()
-var diagnostics := Label.new()
 
 func _ready() -> void:
 	for player in [insert_sound, eject_sound]:
@@ -210,8 +208,6 @@ func _ready() -> void:
 	var crt_material := ShaderMaterial.new()
 	crt_material.shader = preload("res://emulator/crt.gdshader")
 	crt_material.set_shader_parameter("glass_size", SCREEN.size)
-	crt_material.set_shader_parameter("scanlines", scanlines_enabled)
-	crt_material.set_shader_parameter("preset", shader_preset)
 	crt.material = crt_material
 	crt.position = SCREEN.position
 	crt.size = SCREEN.size
@@ -277,19 +273,11 @@ func _ready() -> void:
 	cursor.load_svg_from_string('<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26"><circle cx="13" cy="13" r="9" fill="#2b2037" fill-opacity=".6" stroke="#ffe6bf" stroke-width="2"/><circle cx="13" cy="13" r="2" fill="#ffe6bf"/></svg>')
 	pointer_art = ImageTexture.create_from_image(cursor)
 
-	diagnostics.position = Vector2(163, 49)
-	diagnostics.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var panel := StyleBoxFlat.new()
-	panel.bg_color = Color("#171320ed")
-	panel.content_margin_left = 8
-	panel.content_margin_right = 8
-	panel.content_margin_top = 5
-	panel.content_margin_bottom = 5
-	diagnostics.add_theme_stylebox_override("normal", panel)
-	diagnostics.add_theme_font_size_override("font_size", 12)
-	diagnostics.hide()
-	add_child(diagnostics)
 	load_console_library()
+	first_run.setup(self)
+	add_child(first_run)
+	if not setup_complete:
+		first_run.open.call_deferred()
 
 func _exit_tree() -> void:
 	release_game_mouse()
@@ -306,7 +294,10 @@ func play_cartridge_sound(player: AudioStreamPlayer, clips: Array, previous: int
 
 func restore_preferences() -> void:
 	var config := ConfigFile.new()
-	config.load(SETTINGS_PATH)
+	var existing := config.load(SETTINGS_PATH) == OK
+	setup_complete = bool(config.get_value("setup", "complete", existing))
+	for index in range(2):
+		manual_folders[index] = str(config.get_value("manuals", str(index), ""))
 	megadrive = megadrive_preview_scene or bool(config.get_value("room", "megadrive", false))
 	snes_rom_folder = str(config.get_value("library", "rom_folder", ""))
 	snes_art_folder = str(config.get_value("library", "art_folder", ""))
@@ -314,16 +305,16 @@ func restore_preferences() -> void:
 	md_art_folder = str(config.get_value("megadrive", "art_folder", ""))
 	stacked = bool(config.get_value("library", "stacked", true))
 	ceiling_light_on = bool(config.get_value("room", "ceiling_light", true))
-	television = clampi(int(config.get_value("room", "television", Television.ORIGINAL)), Television.ORIGINAL, Television.SILVER) as Television
 	preferred_core = clampi(int(config.get_value("emulation", "core", 0)), 0, emulator.CORE_NAMES.size() - 1)
-	shader_preset = clampi(int(config.get_value("emulation", "shader_preset", 1)), 0, 2)
-	scanlines_enabled = bool(config.get_value("emulation", "scanlines", false))
 	var overrides: Variant = config.get_value("emulation", "port_one_overrides", {})
 	if overrides is Dictionary:
 		port_one_overrides = overrides
 
 func save_preferences() -> void:
 	var config := ConfigFile.new()
+	config.set_value("setup", "complete", setup_complete)
+	for index in range(2):
+		config.set_value("manuals", str(index), manual_folders[index])
 	config.set_value("library", "rom_folder", library_folder(false))
 	config.set_value("library", "art_folder", library_folder(false, true))
 	config.set_value("megadrive", "rom_folder", library_folder(true))
@@ -331,10 +322,7 @@ func save_preferences() -> void:
 	config.set_value("room", "megadrive", megadrive)
 	config.set_value("library", "stacked", stacked)
 	config.set_value("room", "ceiling_light", ceiling_light_on)
-	config.set_value("room", "television", television)
 	config.set_value("emulation", "core", preferred_core)
-	config.set_value("emulation", "shader_preset", shader_preset)
-	config.set_value("emulation", "scanlines", scanlines_enabled)
 	config.set_value("emulation", "port_one_overrides", port_one_overrides)
 	if config.save(SETTINGS_PATH) != OK:
 		push_warning("Could not save Bedroom Gaming Emulator settings.")
@@ -347,6 +335,7 @@ func library_folder(for_megadrive: bool, artwork := false) -> String:
 	return snes_art_folder if artwork else snes_rom_folder
 
 func load_console_library(keep_session := false) -> void:
+	manual.extra_folder = manual_folders[int(megadrive)]
 	rom_folder = md_rom_folder if megadrive else snes_rom_folder
 	art_folder = md_art_folder if megadrive else snes_art_folder
 	rom_paths.clear()
@@ -430,6 +419,37 @@ func update_console_slide(progress: float) -> void:
 	manual_button.position = manual_position() + right_slide
 	library_navigation.position = Vector2(783, 563) + right_slide
 	queue_redraw()
+
+func finish_setup(folders: Array[PackedStringArray], apply_folders: bool) -> void:
+	setup_complete = true
+	if apply_folders:
+		var active := int(megadrive)
+		var old_rom_folder := rom_folder
+		var old_manual_folder := manual.extra_folder
+		var inactive := 1 - active
+		if folders[0][inactive] != library_folder(inactive == 1):
+			console_emulators[inactive].stop()
+			cartridge_sessions[inactive].clear()
+		snes_rom_folder = folders[0][0]
+		md_rom_folder = folders[0][1]
+		snes_art_folder = folders[1][0]
+		md_art_folder = folders[1][1]
+		manual_folders = folders[2]
+		if old_rom_folder != folders[0][active]:
+			emulator.stop()
+			inserted = -1
+			seated = false
+			powered = false
+			manual.set_rom("")
+			load_console_library()
+		else:
+			art_folder = folders[1][active]
+			refresh_label_art()
+			manual.extra_folder = manual_folders[active]
+			if old_manual_folder != manual.extra_folder and seated and inserted >= 0 and inserted < rom_paths.size():
+				manual.set_rom(rom_paths[inserted])
+		queue_redraw()
+	save_preferences()
 
 func settings_style(fill: String, edge: String, radius: int) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
@@ -606,21 +626,13 @@ func setup_settings() -> void:
 	for button in [folder_button, art_button, scrape_button, emulation_button]:
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 
-	var tv_label := Label.new()
-	tv_label.text = "CRT television"
-	menu.add_child(tv_label)
-	var tv_picker := OptionButton.new()
-	tv_picker.name = "TelevisionPicker"
-	tv_picker.add_item("Original", Television.ORIGINAL)
-	tv_picker.add_item("Graphite", Television.GRAPHITE)
-	tv_picker.add_item("Silver", Television.SILVER)
-	tv_picker.select(int(television))
-	tv_picker.item_selected.connect(func(index: int):
-		television = tv_picker.get_item_id(index) as Television
-		position_tv_inputs()
-		save_preferences()
-		queue_redraw())
-	menu.add_child(tv_picker)
+	var setup_button := Button.new()
+	setup_button.text = "Setup wizard  ›"
+	setup_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	setup_button.pressed.connect(func():
+		settings.hide()
+		first_run.open())
+	menu.add_child(setup_button)
 	menu.move_child(emulation_button, menu.get_child_count() - 1)
 
 	var gear := Button.new()
@@ -678,29 +690,6 @@ func add_emulation_controls(page_controls: VBoxContainer) -> void:
 		else:
 			state_status.text = "No emulator log yet. Insert a ROM first.")
 	page_controls.add_child(log_button)
-
-	var scanlines := CheckButton.new()
-	scanlines.text = "Scanlines"
-	scanlines.button_pressed = scanlines_enabled
-	scanlines.toggled.connect(func(enabled: bool):
-		scanlines_enabled = enabled
-		crt.material.set_shader_parameter("scanlines", enabled)
-		save_preferences()
-		queue_redraw())
-	page_controls.add_child(scanlines)
-
-	var shader_label := Label.new()
-	shader_label.text = "Shader preset"
-	page_controls.add_child(shader_label)
-	var shader_picker := OptionButton.new()
-	for preset in ["Standard", "Soft CRT", "RGB Mask"]:
-		shader_picker.add_item(preset)
-	shader_picker.select(shader_preset)
-	shader_picker.item_selected.connect(func(index: int):
-		shader_preset = index
-		crt.material.set_shader_parameter("preset", index)
-		save_preferences())
-	page_controls.add_child(shader_picker)
 
 func port_one_rom() -> String:
 	return rom_paths[inserted] if not megadrive and seated and inserted >= 0 and inserted < rom_paths.size() else ""
@@ -1110,8 +1099,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.keycode == KEY_F11:
 			var window := get_window()
 			window.mode = Window.MODE_WINDOWED if window.mode == Window.MODE_FULLSCREEN else Window.MODE_FULLSCREEN
-		elif event.keycode == KEY_F10:
-			diagnostics.visible = not diagnostics.visible
 	elif event is InputEventMouseMotion:
 		pointer = event.position
 		var target := desk_cartridge_at(pointer) if stacked and dragging < 0 and not dragging_plug else -1
@@ -1355,10 +1342,6 @@ func _process(delta: float) -> void:
 	screen_spill.visible = screen_light.get_luminance() > 0.005
 	if screen_spill.visible:
 		screen_spill.material.set_shader_parameter("light_color", Vector3(screen_light.r, screen_light.g, screen_light.b))
-	if diagnostics.visible:
-		var status: String = emulator.stats if emulator.running and not emulator.stats.is_empty() else "Insert a ROM to measure playback…"
-		if diagnostics.text != status:
-			diagnostics.text = status
 	if powered and rom_paths.is_empty():
 		queue_redraw()
 
@@ -1761,8 +1744,7 @@ func draw_tv_stand() -> void:
 		Vector2(718, 443)], "#5f4556")
 	gradient(Rect2(121, 443, 597, 12), "#836274", "#463242")
 	line(Vector2(125, 443), Vector2(714, 443), "#ab80915c")
-	var right_foot := 606 if television == Television.SILVER else 646
-	for x in [170, right_foot]:
+	for x in [170, 646]:
 		rounded(Rect2(x, 434, 25, 7), 2, "#24202c")
 
 func draw_graphite_cabinet() -> void:
@@ -1786,26 +1768,7 @@ func draw_graphite_cabinet() -> void:
 	draw_circle(Vector2(695, 452), 2.5, Color("#9fd0bc") if powered else Color("#57444e"))
 	rounded(Rect2(147, 484, 547, 9), 3, "#211d29")
 
-func draw_silver_cabinet() -> void:
-	shape([Vector2(133, 88), Vector2(155, 62), Vector2(632, 62), Vector2(654, 88)], "#827f91")
-	line(Vector2(158, 64), Vector2(629, 64), "#c0b8cc", 2)
-	rounded(Rect2(126, 78, 535, 412), 19, "#888392", "#beb5c5")
-	gradient(Rect2(136, 85, 515, 396), "#a5a0ac", "#706777")
-	rounded(Rect2(139, 84, 508, 385), 17, "#514d5b", "#cfbec9")
-	rounded(TV_GLASS.grow(7), 17, "#181a23", "#807682")
-
-	# A full-width speaker bank sits below the tube with inset controls in the centre.
-	rounded(Rect2(138, 467, 511, 19), 4, "#4b4355", "#a79aad")
-	for y in range(470, 485, 3):
-		line(Vector2(144, y), Vector2(644, y), "#262433")
-		line(Vector2(144, y + 1), Vector2(644, y + 1), "#8d8191")
-	rounded(Rect2(319, 468, 148, 17), 3, "#6f6378", "#9f8da3")
-	draw_circle(Vector2(460, 481), 2.0, Color("#9fd0bc") if powered else Color("#634d62"))
-	rounded(Rect2(154, 486, 478, 7), 3, "#3c3445")
-
 func tv_input_rect(index: int) -> Rect2:
-	if television == Television.SILVER:
-		return Rect2(321 + index * 64, 468, 62, 17)
 	return Rect2(653, 361 + index * 23, 46, 18)
 
 func setup_tv_inputs() -> void:
@@ -1842,22 +1805,7 @@ func draw_tv_inputs() -> void:
 
 func draw_television() -> void:
 	set_prop_transform(TV_OFFSET)
-	match television:
-		Television.GRAPHITE:
-			draw_graphite_cabinet()
-		Television.SILVER:
-			draw_silver_cabinet()
-		_:
-			# The front stays square to the viewer. The top recedes symmetrically.
-			shape([Vector2(130, 85), Vector2(151, 62), Vector2(686, 62), Vector2(707, 85)], "#574e64")
-			line(Vector2(155, 64), Vector2(682, 64), "#85748e", 2)
-			for x in range(536, 653, 7):
-				line(Vector2(x, 67), Vector2(x + 4, 73), "#514757")
-			rounded(Rect2(125, 75, 587, 414), 22, "#3d374b", "#776683")
-			gradient(Rect2(643, 106, 57, 351), "#54475d", "#30283a")
-			line(Vector2(700, 110), Vector2(700, 454), "#67546d")
-			rounded(Rect2(139, 84, 508, 387), 18, "#272432", "#6c5b6d")
-			rounded(Rect2(146, 90, 494, 374), 12, "#141623", "#181925")
+	draw_graphite_cabinet()
 	rounded(TV_GLASS, 16, "#171d2d")
 	if powered and rom_paths.is_empty():
 		gradient(TV_GLASS, "#25344e", "#5b4466")
@@ -1870,14 +1818,6 @@ func draw_television() -> void:
 			Vector2(633, 456), Vector2(153, 456)], "#24313f")
 		words("CRT PREVIEW", 174, 126, 14)
 		words(titles[inserted], 174, 425, 27, 425)
-	if scanlines_enabled:
-		for y in range(98, 456, 4):
-			line(Vector2(153, y), Vector2(633, y), "#090b1524")
-	if television == Television.ORIGINAL:
-		for x in range(660, 696, 5):
-			rounded(Rect2(x, 137, 2, 163), 1, "#30293a")
-		draw_circle(Vector2(674, 442), 3, Color("#88cab5") if powered else Color("#322b39"))
-		box(153, 488, 530, 7, "#241b2a")
 	draw_tv_inputs()
 	set_prop_transform(Vector2.ZERO)
 

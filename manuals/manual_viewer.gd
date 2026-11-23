@@ -7,6 +7,7 @@ signal cover_changed
 const CACHE := "user://manual-cache"
 
 var document_path := ""
+var extra_folder := ""
 var cover: Texture2D
 var page_index := 0
 var page_count := 0
@@ -111,8 +112,8 @@ func set_rom(rom: String) -> void:
 func find_manual(rom: String) -> String:
 	var stem := rom.get_file().get_basename().to_lower()
 	var folder := rom.get_base_dir()
-	for location in [folder.path_join("manuals"), folder]:
-		if not DirAccess.dir_exists_absolute(location):
+	for location in [extra_folder, folder.path_join("manuals"), folder]:
+		if location.is_empty() or not DirAccess.dir_exists_absolute(location):
 			continue
 		for file in DirAccess.get_files_at(location):
 			if file.get_extension().to_lower() == "pdf" and file.get_basename().to_lower() == stem:

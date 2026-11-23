@@ -10,11 +10,17 @@ A Godot 4 Super Nintendo and Mega Drive emulator frontend set in a 1990s bedroom
    - [Snes9x](https://buildbot.libretro.com/nightly/windows/x86_64/latest/snes9x_libretro.dll.zip)
    - [bsnes-mercury Balanced](https://buildbot.libretro.com/nightly/windows/x86_64/latest/bsnes_mercury_balanced_libretro.dll.zip)
 4. In the Godot Project Manager, choose **Import**, select `project.godot`, and press **F5**.
-5. Click the **Settings** gear, then **Choose ROM folder** and select a folder containing your `.sfc` or `.smc` files. Choose the core in **Settings → Emulation**, then drag a cartridge to the slot. To compare cores, eject the cartridge, choose the other core, and reinsert it.
+5. Follow the setup wizard to choose folders for your SNES and Mega Drive libraries and see the gamepad controls. Choose the core in **Settings → Emulation**, then drag a cartridge to the slot. To compare cores, eject the cartridge, choose the other core, and reinsert it.
 
 The sample cartridges show a graphical preview without Python or a core. The core binaries and ROMs are separate from the repository. See the [Snes9x license](https://github.com/libretro/snes9x/blob/master/LICENSE) and [bsnes-mercury source and license](https://github.com/libretro/bsnes-mercury).
 
 The ROM folder and preferences are saved in Godot’s per-user data folder. They carry over when you extract an updated project and run it under the same user account.
+
+## First-time setup
+
+The wizard opens automatically on a fresh profile. It covers controls and lets you choose separate ROM, cartridge art and PDF manual folders for each console. You can skip any folder or skip setup entirely. Open **Settings → Setup wizard** to return later. Existing profiles can open the wizard from Settings.
+
+Keep the same filename stem for matching files, including any region tags. For example, `Sonic (USA).md`, `Sonic (USA).png` and `Sonic (USA).pdf` match.
 
 ## Build a portable Windows ZIP
 
@@ -64,9 +70,9 @@ The app matches the games in the selected ROM folder using filenames and checksu
 
 Click any wall poster to choose a PNG, JPG, JPEG, or WebP image. It stretches to fill that poster and is saved for future launches. Choose **Restore original** in the same dialog to bring back its original artwork.
 
-Click the hanging light to dim the bedroom. The CRT image and its glow keep their brightness. Use **Settings → CRT television** to choose the Original, Graphite, or Silver cabinet.
+Click the hanging light to dim the bedroom. The CRT image and its glow keep their brightness. The room uses the Graphite cabinet with the Soft CRT effect.
 
-**Settings → Emulation** contains the core selector, **Save state**, **Load state**, **Scanlines**, and the **Shader preset** picker. Save states capture the running game and use one slot per ROM and core. These files are separate from battery saves. The display controls take effect immediately.
+**Settings → Emulation** contains the SNES core selector, **Save state**, and **Load state**. Save states capture the running game and use one slot per ROM and core. These files are separate from battery saves.
 
 bsnes Balanced uses its built-in DSP emulation for cartridges such as Super Mario Kart.
 
@@ -100,7 +106,3 @@ The D-pad, face buttons, L1/R1, Start and Back/Select remain mapped to SNES game
 Mario Paint filenames select the SNES Mouse automatically. For other titles, insert the cartridge and choose **SNES Mouse** under **Settings → Emulation → Controller port 1**. The choice is saved for that ROM. **Auto** uses the filename to choose between the mouse and gamepad.
 
 Click the CRT to capture the mouse. Move it and use the left and right buttons in the game. Press **Esc** to return to the room. The mouse also releases when the window loses focus or playback stops.
-
-## Playback diagnostics
-
-Press **F10** while playing to show timing for the current session. Play for a few seconds before reading it. **Core** shows the measured emulation rate and the game's nominal rate. **Received** counts completed frame packets per second, and **CRT** counts video uploads per second. **Godot** shows the window's render rate. **Audio underruns** counts times the generator ran out of samples during the last interval. If playback stutters, capture both lines while it is happening.
