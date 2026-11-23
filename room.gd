@@ -122,6 +122,7 @@ var art_folder := ""
 var art_paths: Dictionary[String, String] = {}
 var sidecar_paths: Dictionary[String, String] = {}
 var label_textures: Dictionary[String, Texture2D] = {}
+var end_label_palettes: Dictionary[String, PackedColorArray] = {}
 var shader_preset := 1
 var preferred_core := 0
 var preview_started := 0
@@ -736,6 +737,7 @@ func refresh_label_art() -> void:
 	art_paths = index_label_images(art_folder)
 	sidecar_paths = index_label_images(rom_folder)
 	label_textures.clear()
+	end_label_palettes.clear()
 
 func index_label_images(path: String) -> Dictionary[String, String]:
 	var images: Dictionary[String, String] = {}
@@ -761,11 +763,37 @@ func cartridge_label_texture(index: int) -> Texture2D:
 			if path.is_empty():
 				continue
 			if image.load(path) == OK and not image.is_empty():
+				if megadrive:
+					end_label_palettes[title] = sample_end_label_palette(image)
 				prepare_label_image(image)
 				texture = ImageTexture.create_from_image(image)
 				break
 		label_textures[title] = texture
 	return label_textures[title]
+
+func sample_end_label_palette(image: Image) -> PackedColorArray:
+	var colors: Dictionary[Color, int] = {}
+	var dimensions := Vector2(image.get_size())
+	for y in range(12):
+		for x in range(24):
+			var point := Vector2i((Vector2(x, y) + Vector2(0.5, 0.5)) * dimensions / Vector2(24, 12))
+			var pixel := image.get_pixelv(point)
+			if pixel.a < 0.75:
+				continue
+			var color := Color(snappedf(pixel.r, 0.125), snappedf(pixel.g, 0.125), snappedf(pixel.b, 0.125))
+			colors[color] = colors.get(color, 0) + 1
+	var ranked := colors.keys()
+	if ranked.is_empty():
+		return PackedColorArray()
+	ranked.sort_custom(func(a: Color, b: Color): return colors[a] > colors[b])
+	var background: Color = ranked[0]
+	var luminance := background.srgb_to_linear().get_luminance()
+	for candidate: Color in ranked:
+		var foreground := candidate.srgb_to_linear().get_luminance()
+		if (maxf(luminance, foreground) + 0.05) / (minf(luminance, foreground) + 0.05) >= 4.5:
+			return PackedColorArray([background, candidate])
+	var ink := Color.BLACK if luminance >= 0.179 else Color.WHITE
+	return PackedColorArray([background, ink])
 
 func prepare_label_image(image: Image) -> void:
 	# Cache the stretched, antialiased label at twice its on-screen size.
@@ -1367,11 +1395,13 @@ func draw_megadrive_cartridge(index: int, at: Vector2, height: float) -> void:
 	var art := cartridge_label_texture(index)
 	var accent: String = LABEL_COLORS[index % LABEL_COLORS.size()]
 	var end_label := Rect2(25, 3, 110, 8)
-	rounded(end_label, 2, accent)
-	if art:
-		draw_texture_rect_region(art, end_label, Rect2(Vector2.ZERO, Vector2(art.get_width(), 7)))
-	else:
-		words(titles[index], 29, 9, 7, 102)
+	var title := titles[index]
+	var palette: PackedColorArray = end_label_palettes.get(title.to_lower(), PackedColorArray())
+	var background := Color(accent) if palette.is_empty() else palette[0]
+	var ink := Color("#f9e4c5") if palette.is_empty() else palette[1]
+	rounded(end_label, 2, background.to_html())
+	draw_string(ThemeDB.fallback_font, Vector2(29, 9.5), title,
+		HORIZONTAL_ALIGNMENT_CENTER, 102, 7, ink)
 	rounded(MD_LABEL.grow(0.8), 4, "#14121b", "#5e5260")
 	if art:
 		draw_texture_rect(art, MD_LABEL, false)
@@ -1758,8 +1788,8 @@ func draw_megadrive_console() -> void:
 
 	for y in range(463, 517, 4):
 		var slope := (y - 463) * 0.31
-		line(Vector2(302 - slope, y), Vector2(344 - slope, y), "#15121b", 2)
-		line(Vector2(302 - slope, y + 1.5), Vector2(344 - slope, y + 1.5), "#4b4455")
+		line(Vector2(286 - slope, y), Vector2(328 - slope, y), "#15121b", 2)
+		line(Vector2(286 - slope, y + 1.5), Vector2(328 - slope, y + 1.5), "#4b4455")
 	var slider := Rect2(320, 524, 32, 12)
 	rounded(slider, 3, "#18151e", "#565061")
 	var switch_x := 325.0 if powered else 338.0
