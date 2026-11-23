@@ -122,6 +122,7 @@ var art_folder := ""
 var art_paths: Dictionary[String, String] = {}
 var sidecar_paths: Dictionary[String, String] = {}
 var label_textures: Dictionary[String, Texture2D] = {}
+var title_tags := RegEx.create_from_string(r"\([^()\[\]]*\)|\[[^()\[\]]*\]")
 var end_label_palettes: Dictionary[String, PackedColorArray] = {}
 var shader_preset := 1
 var preferred_core := 0
@@ -1377,6 +1378,13 @@ func cartridge(index: int, at: Vector2, visible_height := -1.0) -> void:
 			line(Vector2(x - 1, screw_y), Vector2(x + 1, screw_y), "#37343d" if black_shell else "#b5a9b2")
 	draw_set_transform(Vector2.ZERO)
 
+func cartridge_display_title(title: String) -> String:
+	var cleaned := title_tags.sub(title, "", true)
+	while cleaned != title:
+		title = cleaned
+		cleaned = title_tags.sub(title, "", true)
+	return " ".join(cleaned.split(" ", false))
+
 func draw_megadrive_cartridge(index: int, at: Vector2, height: float) -> void:
 	draw_set_transform(at, 0.0, Vector2(MD_CART_WIDTH_SCALE, 1))
 	if height == MD_CART_SIZE.y:
@@ -1400,8 +1408,12 @@ func draw_megadrive_cartridge(index: int, at: Vector2, height: float) -> void:
 	var background := Color(accent) if palette.is_empty() else palette[0]
 	var ink := Color("#f9e4c5") if palette.is_empty() else palette[1]
 	rounded(end_label, 2, background.to_html())
-	draw_string(ThemeDB.fallback_font, Vector2(29, 9.5), title,
-		HORIZONTAL_ALIGNMENT_CENTER, 102, 7, ink)
+	var shell_scale := Vector2(MD_CART_WIDTH_SCALE, 1)
+	var text_baseline := Vector2(29, 8.25) * shell_scale
+	draw_set_transform(at + text_baseline, 0.0, shell_scale * 0.5)
+	draw_string(ThemeDB.fallback_font, Vector2.ZERO, cartridge_display_title(title),
+		HORIZONTAL_ALIGNMENT_CENTER, 204, 7, ink)
+	draw_set_transform(at, 0.0, shell_scale)
 	rounded(MD_LABEL.grow(0.8), 4, "#14121b", "#5e5260")
 	if art:
 		draw_texture_rect(art, MD_LABEL, false)
@@ -1788,8 +1800,8 @@ func draw_megadrive_console() -> void:
 
 	for y in range(463, 517, 4):
 		var slope := (y - 463) * 0.31
-		line(Vector2(286 - slope, y), Vector2(328 - slope, y), "#15121b", 2)
-		line(Vector2(286 - slope, y + 1.5), Vector2(328 - slope, y + 1.5), "#4b4455")
+		line(Vector2(281 - slope, y), Vector2(323 - slope, y), "#15121b", 2)
+		line(Vector2(281 - slope, y + 1.5), Vector2(323 - slope, y + 1.5), "#4b4455")
 	var slider := Rect2(320, 524, 32, 12)
 	rounded(slider, 3, "#18151e", "#565061")
 	var switch_x := 325.0 if powered else 338.0

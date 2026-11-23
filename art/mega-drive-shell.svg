@@ -19,7 +19,7 @@
     <path d="M13 113l15-34h63l24 26h130l17-26h25l9 42q2 11-14 12H19q-14 0-11-10z" fill="url(#facet)"/>
     <path d="M16 137q2 4 10 4h247q12 0 16-4" fill="none" stroke="#514858" stroke-opacity=".62"/>
   </g>
-  <path d="M34 21l8-7h43L65 71H21z" transform="translate(-16 0)" fill="#24212b" stroke="#16131d"/>
+  <path d="M18 20q1-5 7-6h43L48 71H1z" fill="#24212b" stroke="#16131d"/>
   <ellipse cx="185" cy="63" rx="93" ry="61" fill="#16141d"/>
   <ellipse cx="185" cy="58" rx="92" ry="57" fill="url(#disc)" stroke="#56505f" stroke-width="1.5"/>
   <ellipse cx="185" cy="58" rx="81" ry="51" fill="none" stroke="#191720" stroke-width="1.3"/>
