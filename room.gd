@@ -41,7 +41,7 @@ const MD_RESET := Rect2(318, 550, 34, 12)
 const MD_CART_WIDTH_SCALE := 0.9
 const MD_CART_SIZE := Vector2(160 * MD_CART_WIDTH_SCALE, 73)
 const MD_LABEL := Rect2(24, 11, 112, 55)
-const MD_SEATED_HEIGHT := MD_CART_SIZE.y * 0.9
+const MD_SEATED_HEIGHT := 39.0
 const MD_PORT_ONE := Rect2(422, 592, 33, 9)
 const MD_PORT_TWO := Rect2(472, 592, 33, 9)
 const MD_EXTENSIONS := ["md", "gen", "bin", "smd"]
@@ -1432,8 +1432,9 @@ func draw_megadrive_cartridge(index: int, at: Vector2, height: float) -> void:
 	else:
 		rounded(label, 3, accent)
 		line(Vector2(30, 22), Vector2(75, 22), "#e6b995", 2)
-		words(titles[index], 31, 45, 11, 98)
-		words("MEGA DRIVE", 31, 61, 7, 96)
+		words(title, 31, minf(45.0, height - 5.0), 11, 98)
+		if height >= 63.0:
+			words("MEGA DRIVE", 31, 61, 7, 96)
 	draw_set_transform(Vector2.ZERO)
 
 func setup_posters() -> void:
