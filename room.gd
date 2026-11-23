@@ -94,6 +94,14 @@ var manual_opacity := 0.0:
 	set(value):
 		manual_opacity = value
 		queue_redraw()
+signal console_changed
+
+var tv_input_buttons: Array[Button] = []
+var library_navigation := HBoxContainer.new()
+var console_transition: Tween
+var left_slide := Vector2.ZERO
+var right_slide := Vector2.ZERO
+var prop_draw_offset := Vector2.ZERO
 var notebook_button := Button.new()
 var notebook := preload("res://cartridge_notebook.gd").new()
 var shoebox_indices: Array[int] = []
@@ -224,6 +232,7 @@ func _ready() -> void:
 	emulator.frame_changed.connect(update_crt)
 	emulator.failed.connect(show_emulator_error)
 
+	setup_tv_inputs()
 	setup_settings()
 	add_child(notebook)
 	notebook.setup(self)
@@ -356,6 +365,28 @@ func switch_console(index: int) -> void:
 	megadrive = index == 1
 	load_console_library()
 	save_preferences()
+	console_changed.emit()
+
+func request_console_switch(index: int) -> void:
+	if console_transition or megadrive == (index == 1):
+		return
+	dragging = -1
+	dragging_plug = false
+	clear_stack_hover()
+	manual.hide()
+	console_transition = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	console_transition.tween_method(update_console_slide, 0.0, 1.0, 0.36)
+	console_transition.tween_callback(switch_console.bind(index))
+	console_transition.tween_method(update_console_slide, 1.0, 0.0, 0.40)
+	console_transition.finished.connect(func(): console_transition = null)
+
+func update_console_slide(progress: float) -> void:
+	left_slide = Vector2(-760.0 * progress, 0)
+	right_slide = Vector2(maxf(420.0, get_viewport_rect().end.x - 738.0) * progress, 0)
+	notebook_button.position = notebook_position() + right_slide
+	manual_button.position = manual_position() + right_slide
+	library_navigation.position = Vector2(783, 563) + right_slide
+	queue_redraw()
 
 func settings_style(fill: String, edge: String, radius: int) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
@@ -520,7 +551,11 @@ func setup_settings() -> void:
 	core_picker.visible = not megadrive
 	core_label.text = emulator.MEGA_DRIVE_CORE_NAME if megadrive else "SNES core"
 	console_picker.item_selected.connect(func(index: int):
-		switch_console(index)
+		console_picker.select(int(megadrive))
+		settings.hide()
+		request_console_switch(index))
+	console_changed.connect(func():
+		console_picker.select(int(megadrive))
 		scrape_button.disabled = megadrive
 		core_picker.visible = not megadrive
 		core_label.text = emulator.MEGA_DRIVE_CORE_NAME if megadrive else "SNES core")
@@ -539,6 +574,7 @@ func setup_settings() -> void:
 	tv_picker.select(int(television))
 	tv_picker.item_selected.connect(func(index: int):
 		television = tv_picker.get_item_id(index) as Television
+		position_tv_inputs()
 		save_preferences()
 		queue_redraw())
 	menu.add_child(tv_picker)
@@ -914,7 +950,7 @@ func console_cartridge_height() -> float:
 	return minf(cartridge_size().y, seated_height + lift)
 
 func setup_cartridge_navigation() -> void:
-	var controls := HBoxContainer.new()
+	var controls := library_navigation
 	controls.position = Vector2(783, 563)
 	controls.size = Vector2(331, 26)
 	controls.add_theme_constant_override("separation", 8)
@@ -983,6 +1019,9 @@ func refresh_alphabet() -> void:
 	alphabet_button.disabled = menu.item_count == 0
 
 func _input(event: InputEvent) -> void:
+	if console_transition and event is InputEventMouse:
+		get_viewport().set_input_as_handled()
+		return
 	if mouse_captured:
 		if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 			release_game_mouse()
@@ -1325,7 +1364,7 @@ func cartridge(index: int, at: Vector2, visible_height := -1.0) -> void:
 		return
 	var width := CART_SIZE.x
 	var black_shell := uses_black_shell(titles[index])
-	draw_set_transform(at)
+	set_prop_transform(at)
 	if visible_height == CART_SIZE.y:
 		rounded(Rect2(Vector2(3, 5), CART_SIZE), 6, "#18142596")
 
@@ -1376,7 +1415,7 @@ func cartridge(index: int, at: Vector2, visible_height := -1.0) -> void:
 		for x in [11.0, width - 11.0]:
 			draw_circle(Vector2(x, screw_y), 2.5, Color("#101014" if black_shell else "#665e6a"), true, -1, true)
 			line(Vector2(x - 1, screw_y), Vector2(x + 1, screw_y), "#37343d" if black_shell else "#b5a9b2")
-	draw_set_transform(Vector2.ZERO)
+	set_prop_transform(Vector2.ZERO)
 
 func cartridge_display_title(title: String) -> String:
 	var cleaned := title_tags.sub(title, "", true)
@@ -1386,7 +1425,7 @@ func cartridge_display_title(title: String) -> String:
 	return " ".join(cleaned.split(" ", false))
 
 func draw_megadrive_cartridge(index: int, at: Vector2, height: float) -> void:
-	draw_set_transform(at, 0.0, Vector2(MD_CART_WIDTH_SCALE, 1))
+	set_prop_transform(at, 0.0, Vector2(MD_CART_WIDTH_SCALE, 1))
 	if height == MD_CART_SIZE.y:
 		rounded(Rect2(Vector2(3, 5), Vector2(160, height)), 11, "#15111e99")
 	var shell := PackedVector2Array([Vector2(0, 11), Vector2(6, 8), Vector2(154, 8), Vector2(160, 11)])
@@ -1419,10 +1458,10 @@ func draw_megadrive_cartridge(index: int, at: Vector2, height: float) -> void:
 	rounded(end_label, 2, background.to_html())
 	var shell_scale := Vector2(MD_CART_WIDTH_SCALE, 1)
 	var text_baseline := Vector2(29, 8.25) * shell_scale
-	draw_set_transform(at + text_baseline, 0.0, shell_scale * 0.5)
+	set_prop_transform(at + text_baseline, 0.0, shell_scale * 0.5)
 	draw_string(ThemeDB.fallback_font, Vector2.ZERO, cartridge_display_title(title),
 		HORIZONTAL_ALIGNMENT_CENTER, 204, 7, ink)
-	draw_set_transform(at, 0.0, shell_scale)
+	set_prop_transform(at, 0.0, shell_scale)
 	var visible_face := Rect2(0, 0, 160, height)
 	var label := MD_LABEL.intersection(visible_face)
 	rounded(MD_LABEL.grow(0.8).intersection(visible_face), 4, "#14121b", "#5e5260")
@@ -1435,7 +1474,7 @@ func draw_megadrive_cartridge(index: int, at: Vector2, height: float) -> void:
 		words(title, 31, minf(45.0, height - 5.0), 11, 98)
 		if height >= 63.0:
 			words("MEGA DRIVE", 31, 61, 7, 96)
-	draw_set_transform(Vector2.ZERO)
+	set_prop_transform(Vector2.ZERO)
 
 func setup_posters() -> void:
 	poster_picker.access = FileDialog.ACCESS_FILESYSTEM
@@ -1503,13 +1542,13 @@ func restore_poster() -> void:
 func draw_posters() -> void:
 	for index in range(poster_images.size()):
 		var frame: Rect2 = POSTER_RECTS[index]
-		draw_set_transform(frame.position, deg_to_rad(POSTER_TILTS[index]))
+		set_prop_transform(frame.position, deg_to_rad(POSTER_TILTS[index]))
 		draw_rect(Rect2(Vector2(3, 5), frame.size), Color("#160e2080"))
 		draw_rect(Rect2(Vector2.ZERO, frame.size), Color("#baa29c"))
 		draw_texture_rect(poster_images[index], Rect2(Vector2.ZERO, frame.size).grow(-2.0), false, Color("#d6bdcc"))
 		var tape_x := 10.0 if index % 2 == 0 else frame.size.x - 27.0
 		box(tape_x, -2, 17, 5, "#e1bc995a")
-		draw_set_transform(Vector2.ZERO)
+		set_prop_transform(Vector2.ZERO)
 
 func draw_bedroom() -> void:
 	var room_bounds := Rect2(0, 0, 1152, 648)
@@ -1577,7 +1616,7 @@ func notebook_position() -> Vector2:
 
 func draw_notebook() -> void:
 	# The front cartridge covers the lower part of the pad.
-	draw_set_transform(notebook_position(), notebook_button.rotation)
+	set_prop_transform(notebook_position(), notebook_button.rotation)
 	rounded(Rect2(4, 6, 101, 93), 4, "#24182875")
 	rounded(Rect2(-2, 1, 103, 94), 4, "#6f4b50", "#956a63")
 	rounded(Rect2(1, 3, 98, 91), 3, "#ad8c7a", "#e0b998")
@@ -1596,7 +1635,7 @@ func draw_notebook() -> void:
 	draw_polyline(notes, Color("#675173aa"), 1.1, true)
 	line(Vector2(23, 38), Vector2(76, 36), "#67517379")
 	line(Vector2(23, 45), Vector2(64, 44), "#67517369")
-	draw_set_transform(Vector2.ZERO)
+	set_prop_transform(Vector2.ZERO)
 
 func setup_manual() -> void:
 	manual_button.name = "InstructionManual"
@@ -1629,7 +1668,7 @@ func manual_position() -> Vector2:
 	return Vector2(967, 238 if stacked else 192)
 
 func draw_manual() -> void:
-	draw_set_transform(manual_position(), manual_button.rotation)
+	set_prop_transform(manual_position(), manual_button.rotation)
 	rounded(Rect2(4, 4, 86, 103), 3, "#21172798")
 	rounded(Rect2(2, 2, 85, 102), 2, "#bb9d8a", "#846b74")
 	rounded(Rect2(0, 0, 84, 99), 2, "#dacebd" if manual_button.is_hovered() else "#bba99e", "#d7bfaa")
@@ -1645,7 +1684,7 @@ func draw_manual() -> void:
 	line(Vector2(4, 4), Vector2(4, 96), "#ac8991")
 	for y in [14, 38, 62, 86]:
 		line(Vector2(1, y), Vector2(4, y), "#dfc2b1", 1)
-	draw_set_transform(Vector2.ZERO)
+	set_prop_transform(Vector2.ZERO)
 
 func draw_shoebox_front() -> void:
 	# Draw the front lip after the contents so it occludes their shadows.
@@ -1693,7 +1732,7 @@ func draw_graphite_cabinet() -> void:
 		line(Vector2(658, y), Vector2(700, y), "#60606f")
 		line(Vector2(658, y + 1), Vector2(700, y + 1), "#24232c", 2)
 	rounded(Rect2(655, 341, 48, 131), 4, "#2e2b39", "#4f485b")
-	for y in [354, 376, 398, 434]:
+	for y in [348, 418, 434]:
 		rounded(Rect2(664, y, 28, 9), 4, "#171720", "#645c6e")
 		line(Vector2(669, y + 1), Vector2(686, y + 1), "#878093")
 	draw_circle(Vector2(695, 452), 2.5, Color("#9fd0bc") if powered else Color("#57444e"))
@@ -1713,13 +1752,48 @@ func draw_silver_cabinet() -> void:
 		line(Vector2(144, y), Vector2(644, y), "#262433")
 		line(Vector2(144, y + 1), Vector2(644, y + 1), "#8d8191")
 	rounded(Rect2(319, 468, 148, 17), 3, "#6f6378", "#9f8da3")
-	for x in range(337, 450, 23):
-		rounded(Rect2(x, 472, 15, 7), 3, "#8d8195", "#484250")
 	draw_circle(Vector2(460, 481), 2.0, Color("#9fd0bc") if powered else Color("#634d62"))
 	rounded(Rect2(154, 486, 478, 7), 3, "#3c3445")
 
+func tv_input_rect(index: int) -> Rect2:
+	if television == Television.SILVER:
+		return Rect2(321 + index * 64, 468, 62, 17)
+	return Rect2(653, 361 + index * 23, 46, 18)
+
+func setup_tv_inputs() -> void:
+	for index in range(2):
+		var button := Button.new()
+		button.name = "SnesInput" if index == 0 else "MegaDriveInput"
+		button.flat = true
+		button.focus_mode = Control.FOCUS_NONE
+		button.tooltip_text = "Switch TV input to Super Nintendo" if index == 0 else "Switch TV input to Mega Drive"
+		button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		button.mouse_entered.connect(queue_redraw)
+		button.mouse_exited.connect(queue_redraw)
+		button.pressed.connect(request_console_switch.bind(index))
+		add_child(button)
+		tv_input_buttons.append(button)
+	position_tv_inputs()
+
+func position_tv_inputs() -> void:
+	for index in range(tv_input_buttons.size()):
+		var rect := tv_input_rect(index)
+		tv_input_buttons[index].position = rect.position + TV_OFFSET
+		tv_input_buttons[index].size = rect.size
+
+func draw_tv_inputs() -> void:
+	for index in range(tv_input_buttons.size()):
+		var rect := tv_input_rect(index)
+		var active := index == int(megadrive)
+		var hovered_button := tv_input_buttons[index].is_hovered()
+		rounded(rect, 3, "#3b514d" if active else ("#51495b" if hovered_button else "#302936"),
+			"#86998b" if active else "#716275")
+		draw_string(ThemeDB.fallback_font, rect.position + Vector2(0, 12),
+			"SNES" if index == 0 else "MEGA DRIVE", HORIZONTAL_ALIGNMENT_CENTER,
+			int(rect.size.x), 7, Color("#dcf0d8" if active else "#dabfca"))
+
 func draw_television() -> void:
-	draw_set_transform(TV_OFFSET)
+	set_prop_transform(TV_OFFSET)
 	match television:
 		Television.GRAPHITE:
 			draw_graphite_cabinet()
@@ -1754,11 +1828,10 @@ func draw_television() -> void:
 	if television == Television.ORIGINAL:
 		for x in range(660, 696, 5):
 			rounded(Rect2(x, 137, 2, 163), 1, "#30293a")
-		rounded(Rect2(660, 382, 34, 29), 6, "#3e3446", "#78677b")
-		draw_circle(Vector2(677, 396), 7, Color("#827280"), true, -1, true)
 		draw_circle(Vector2(674, 442), 3, Color("#88cab5") if powered else Color("#322b39"))
 		box(153, 488, 530, 7, "#241b2a")
-	draw_set_transform(Vector2.ZERO)
+	draw_tv_inputs()
+	set_prop_transform(Vector2.ZERO)
 
 func draw_console() -> void:
 	if megadrive:
@@ -1766,7 +1839,7 @@ func draw_console() -> void:
 		return
 	# The wide front and foreshortened top follow the angled PAL reference.
 	glow(Vector2(414, 587), Vector2(171, 27), Color("#201927b0"))
-	draw_set_transform_matrix(CONSOLE_TRANSFORM)
+	set_prop_matrix(CONSOLE_TRANSFORM)
 	draw_texture_rect(preload("res://art/pal-console-shell.png"), Rect2(272, 494, 289, 114), false)
 
 	# The top hatch sits behind the three controls, with its lip in front of the cartridge.
@@ -1783,10 +1856,10 @@ func draw_console() -> void:
 	if dragging >= 0 and cartridge_edge_meets_slot(pointer):
 		rounded(SLOT_ART.grow(3), 7, "#eab58975", "#ffdfad")
 	if inserted >= 0 and inserted != dragging:
-		draw_set_transform(Vector2.ZERO)
+		set_prop_transform(Vector2.ZERO)
 		# At rest the slot hides the shell immediately below the label.
 		cartridge(inserted, console_position(), console_cartridge_height())
-		draw_set_transform_matrix(CONSOLE_TRANSFORM)
+		set_prop_matrix(CONSOLE_TRANSFORM)
 	draw_texture_rect(preload("res://art/pal-console-slot-lip.png"), Rect2(SLOT_ART.position.x - 7.0, SLOT_ART.end.y - 3.0, SLOT_ART.size.x + 14.0, 7.0), false)
 
 	draw_console_button(Rect2(321, 548, 39, BUTTON_HEIGHT), "POWER", "#575465")
@@ -1796,7 +1869,7 @@ func draw_console() -> void:
 	draw_console_button(RESET_ART, "RESET", "#817d90" if RESET.has_point(pointer) else "#626070")
 
 	draw_console_wordmark()
-	draw_set_transform(Vector2.ZERO)
+	set_prop_transform(Vector2.ZERO)
 
 func draw_megadrive_console() -> void:
 	glow(Vector2(412, 594), Vector2(171, 20), Color("#16121fbf"))
@@ -1839,7 +1912,7 @@ func draw_console_wordmark() -> void:
 	var title := "SUPER NINTENDO"
 	var subtitle := "ENTERTAINMENT SYSTEM"
 	var title_width := font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
-	draw_set_transform_matrix(CONSOLE_TRANSFORM * Transform2D(0.0, Vector2(1, 0.43), 0.0, Vector2(321, 578.7)))
+	set_prop_matrix(CONSOLE_TRANSFORM * Transform2D(0.0, Vector2(1, 0.43), 0.0, Vector2(321, 578.7)))
 	draw_string(font, Vector2.ZERO, title, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color("#494654"))
 
 	var glyph_widths := PackedFloat32Array()
@@ -1849,12 +1922,12 @@ func draw_console_wordmark() -> void:
 		glyph_widths.append(glyph_width)
 		subtitle_width += glyph_width
 	var tracking := (title_width - subtitle_width) / (subtitle.length() - 1)
-	draw_set_transform_matrix(CONSOLE_TRANSFORM * Transform2D(0.0, Vector2(1, 0.48), 0.0, Vector2(321, 581.9)))
+	set_prop_matrix(CONSOLE_TRANSFORM * Transform2D(0.0, Vector2(1, 0.48), 0.0, Vector2(321, 581.9)))
 	var x := 0.0
 	for index in range(subtitle.length()):
 		draw_string(font, Vector2(x, 0), subtitle.substr(index, 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 5, Color("#68616c"))
 		x += glyph_widths[index] + tracking
-	draw_set_transform_matrix(CONSOLE_TRANSFORM)
+	set_prop_matrix(CONSOLE_TRANSFORM)
 
 func draw_controller_plugs() -> void:
 	var first := seated_plug_position(MD_PORT_ONE if megadrive else PLAYER_ONE_SOCKET)
@@ -1896,20 +1969,34 @@ func draw_console_button(rect: Rect2, label: String, color: String) -> void:
 
 func draw_console_caption(label: String, baseline: Vector2, width: float, size: int, ink: String) -> void:
 	var caption_transform := Transform2D(0.0, Vector2(1, 0.51), 0.0, baseline)
-	draw_set_transform_matrix(CONSOLE_TRANSFORM * caption_transform)
+	set_prop_matrix(CONSOLE_TRANSFORM * caption_transform)
 	draw_string(ThemeDB.fallback_font, Vector2.ZERO, label, HORIZONTAL_ALIGNMENT_CENTER, width, size, Color(ink))
-	draw_set_transform_matrix(CONSOLE_TRANSFORM)
+	set_prop_matrix(CONSOLE_TRANSFORM)
+
+func set_prop_transform(origin: Vector2, rotation := 0.0, scale := Vector2.ONE) -> void:
+	draw_set_transform(origin + prop_draw_offset, rotation, scale)
+
+func set_prop_matrix(matrix: Transform2D) -> void:
+	draw_set_transform_matrix(matrix.translated(prop_draw_offset))
 
 func _draw() -> void:
 	draw_bedroom()
 	draw_ceiling_light()
+	prop_draw_offset = right_slide
+	set_prop_transform(Vector2.ZERO)
 	draw_shoebox()
 	draw_notebook()
 	draw_manual()
+	prop_draw_offset = Vector2.ZERO
+	set_prop_transform(Vector2.ZERO)
 	draw_tv_stand()
 	draw_television()
+	prop_draw_offset = left_slide
+	set_prop_transform(Vector2.ZERO)
 	draw_console()
 	draw_controller_plugs()
+	prop_draw_offset = right_slide
+	set_prop_transform(Vector2.ZERO)
 	for index in visible_cartridges():
 		if index != inserted and index != dragging:
 			var position := displayed_desk_position(index)
@@ -1917,6 +2004,8 @@ func _draw() -> void:
 				rounded(Rect2(position - Vector2(3, 3), cartridge_size() + Vector2(6, 6)), 6, "#f7ca9188")
 			cartridge(index, position)
 	draw_shoebox_front()
+	prop_draw_offset = Vector2.ZERO
+	set_prop_transform(Vector2.ZERO)
 	if dragging >= 0 and not (megadrive and seated and dragging == inserted):
 		cartridge(dragging, dragged_cartridge_position(pointer))
 	room_overlay.queue_redraw()
@@ -1929,11 +2018,11 @@ func draw_room_overlay() -> void:
 	if not powered:
 		return
 	if megadrive:
-		var led := Vector2(447, 550)
+		var led := Vector2(447, 550) + left_slide
 		glow(led, Vector2(13, 9), Color("#fb435475"), room_overlay)
 		room_overlay.draw_circle(led, 2.3, Color("#fc4258"), true, -1, true)
 	else:
-		room_overlay.draw_set_transform_matrix(CONSOLE_TRANSFORM)
+		room_overlay.draw_set_transform_matrix(CONSOLE_TRANSFORM.translated(left_slide))
 		glow(Vector2(499, 579), Vector2(20, 8), Color("#ff4d5568"), room_overlay)
 		rounded(Rect2(492, 577.8, 14, 3), 2, "#ff3d5c", "", room_overlay)
 		room_overlay.draw_line(Vector2(495, 578.3), Vector2(503, 578.3), Color("#ffacaf"), 1.0, true)

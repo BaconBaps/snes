@@ -38,7 +38,7 @@ To make a custom shoebox, enter a name and click **Create box**. Select a game i
 
 Extract the [Windows x64 Genesis Plus GX core](https://buildbot.libretro.com/nightly/windows/x86_64/latest/genesis_plus_gx_libretro.dll.zip) into `emulator` beside `host.py`. On Linux x86-64, use the [Linux core](https://buildbot.libretro.com/nightly/linux/x86_64/latest/genesis_plus_gx_libretro.so.zip).
 
-Choose **Mega Drive** from the console selector in Settings, then choose a ROM folder containing `.md`, `.gen`, `.bin`, or `.smd` cartridges. The Mega Drive remembers its own ROM and artwork folders. Drag a cartridge into the slot to boot it, click the white **Reset** button to restart, and pull the cartridge free to power off. The sample cartridges still work as a graphical preview without a ROM folder.
+Press **MEGA DRIVE** on the TV or choose it in Settings, then choose a ROM folder containing `.md`, `.gen`, `.bin`, or `.smd` cartridges. The Mega Drive remembers its own ROM and artwork folders. Use the **SNES** and **MEGA DRIVE** buttons on the TV to switch inputs. Switching stops the active game as the console and shoebox slide away. Drag a cartridge into the slot to boot it, click the white **Reset** button to restart, and pull the cartridge free to power off. The sample cartridges still work as a graphical preview without a ROM folder.
 
 The core uses six-button controllers. On a gamepad, the west, south, and east face buttons map to A, B, and C. L1, north, and R1 map to X, Y, and Z. On the keyboard, **A**, **Z**, **X** map to A, B, C, and **Q**, **S**, **W** map to X, Y, Z. Enter is Start and Shift is Mode. Connect the second plug to enable Player 2.
 
