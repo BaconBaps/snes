@@ -178,6 +178,10 @@ var lift := 0.0:
 
 var crt := TextureRect.new()
 var crt_glass := ColorRect.new()
+const INPUT_STATIC_SECONDS := 0.20
+var crt_static := ColorRect.new()
+var input_static_timer := Timer.new()
+var input_hiss := AudioStreamPlayer.new()
 var room_dimmer := ColorRect.new()
 var room_overlay := Node2D.new()
 var ceiling_light_on := true
@@ -216,6 +220,7 @@ func _ready() -> void:
 	crt.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	crt.hide()
 	add_child(crt)
+	setup_crt_static()
 	var glass_material := ShaderMaterial.new()
 	glass_material.shader = preload("res://emulator/crt_glass.gdshader")
 	glass_material.set_shader_parameter("glass_size", SCREEN.size)
@@ -406,7 +411,11 @@ func request_console_switch(index: int) -> void:
 	manual.hide()
 	console_transition = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	console_transition.tween_method(update_console_slide, 0.0, 1.0, 0.36)
-	console_transition.tween_callback(switch_console.bind(index))
+	console_transition.tween_callback(func():
+		input_static_timer.start()
+		input_hiss.play()
+		update_crt_static()
+		switch_console(index))
 	console_transition.tween_method(update_console_slide, 1.0, 0.0, 0.40)
 	console_transition.finished.connect(func():
 		console_transition = null
@@ -747,6 +756,49 @@ func release_game_mouse() -> void:
 		message = MOUSE_CAPTURE_HINT if emulator.mouse_enabled else ""
 	queue_redraw()
 
+func setup_crt_static() -> void:
+	var material := ShaderMaterial.new()
+	material.shader = preload("res://emulator/crt_static.gdshader")
+	material.set_shader_parameter("glass_size", SCREEN.size)
+	crt_static.material = material
+	crt_static.position = SCREEN.position
+	crt_static.size = SCREEN.size
+	crt_static.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(crt_static)
+
+	input_static_timer.one_shot = true
+	input_static_timer.wait_time = INPUT_STATIC_SECONDS
+	input_static_timer.timeout.connect(update_crt_static)
+	add_child(input_static_timer)
+	input_hiss.stream = create_input_hiss()
+	input_hiss.volume_db = -12.0
+	add_child(input_hiss)
+	update_crt_static()
+
+func create_input_hiss() -> AudioStreamWAV:
+	const SAMPLE_RATE := 22050
+	var count := int(SAMPLE_RATE * INPUT_STATIC_SECONDS)
+	var data := PackedByteArray()
+	data.resize(count * 2)
+	var random := RandomNumberGenerator.new()
+	random.seed = 117
+	var filtered := 0.0
+	for index in range(count):
+		var progress := float(index) / count
+		filtered = lerpf(filtered, random.randf_range(-1.0, 1.0), 0.64)
+		var envelope := smoothstep(0.0, 0.02, progress) * (1.0 - smoothstep(0.22, 1.0, progress))
+		data.encode_s16(index * 2, roundi(filtered * envelope * 16000.0))
+	var stream := AudioStreamWAV.new()
+	stream.format = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate = SAMPLE_RATE
+	stream.data = data
+	return stream
+
+func update_crt_static() -> void:
+	var switching := not input_static_timer.is_stopped()
+	crt_static.visible = switching or (not crt.visible and not (powered and rom_paths.is_empty()))
+	crt_static.material.set_shader_parameter("switching_input", switching)
+
 func update_crt() -> void:
 	if not emulator.mouse_enabled:
 		release_game_mouse()
@@ -760,6 +812,7 @@ func update_crt() -> void:
 		crt.material.set_shader_parameter("rgb565", emulator.rgb565)
 
 func update_glass_sheen() -> void:
+	crt_static.material.set_shader_parameter("brightness", 1.0 if ceiling_light_on else 0.54)
 	var strength := 0.43 if crt.visible else 1.0
 	if not ceiling_light_on and not crt.visible:
 		strength *= 0.22
@@ -1335,6 +1388,9 @@ func show_emulator_error(error: String) -> void:
 
 func _process(delta: float) -> void:
 	update_gamepad_pointer(delta)
+	var has_signal := crt.visible or (powered and rom_paths.is_empty())
+	if input_static_timer.is_stopped() and crt_static.visible == has_signal:
+		update_crt_static()
 	var target := emulator.screen_light
 	if powered and rom_paths.is_empty():
 		target = Color("#496185")
