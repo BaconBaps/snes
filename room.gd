@@ -2121,8 +2121,10 @@ func draw_megadrive_flaps(opening: float, front: bool) -> void:
 	var span := lerpf(MD_SLOT.size.y * 0.5 - 1.0, 1.4, opening)
 	var flap := Rect2(x, hinge_y - span if front else hinge_y, MD_SLOT.size.x - 14.0, span)
 	rounded(flap, 2, "#252331" if front else "#33303e", "#191822")
-	if front:
-		line(flap.position + Vector2(5, 0.5), Vector2(flap.end.x - 5, flap.position.y + 0.5), "#626071")
+	if front and opening < 1.0:
+		var highlight := Color(Color("#626071"), 1.0 - opening)
+		prop_canvas.draw_line(flap.position + Vector2(5, 0.5),
+			Vector2(flap.end.x - 5, flap.position.y + 0.5), highlight, 1.0, true)
 
 func draw_console_wordmark() -> void:
 	var font := ThemeDB.fallback_font
