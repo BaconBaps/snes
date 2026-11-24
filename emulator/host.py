@@ -1,5 +1,6 @@
 """Run a libretro core and stream frames to the Godot room."""
 
+from contextlib import contextmanager
 import ctypes as c
 import faulthandler
 import logging
@@ -9,7 +10,9 @@ import select
 import socket
 import struct
 import sys
+from tempfile import TemporaryDirectory
 import time
+from zipfile import BadZipFile, ZipFile
 
 VOID = c.c_void_p
 UINT = c.c_uint
@@ -333,7 +336,51 @@ class Emulator:
                 deadline = time.monotonic()
 
 
-def run_host(port, nonce, core, rom, save, mouse_enabled=False):
+SNES_ROM_EXTENSIONS = {".sfc", ".smc"}
+MEGA_DRIVE_ROM_EXTENSIONS = {".md", ".gen", ".bin", ".smd"}
+MAX_ARCHIVED_ROM_SIZE = 32 * 1024 * 1024
+
+
+@contextmanager
+def cartridge_path(path, megadrive):
+    if path.suffix.lower() != ".zip":
+        yield path
+        return
+
+    supported = MEGA_DRIVE_ROM_EXTENSIONS if megadrive else SNES_ROM_EXTENSIONS
+    try:
+        with ZipFile(path) as archive:
+            entries = [
+                entry for entry in archive.infolist()
+                if not entry.is_dir()
+                and "__MACOSX" not in entry.filename.split("/")
+                and not Path(entry.filename).name.startswith("._")
+                and Path(entry.filename).suffix.lower() in SNES_ROM_EXTENSIONS | MEGA_DRIVE_ROM_EXTENSIONS
+            ]
+            if len(entries) != 1:
+                raise ValueError("A cartridge ZIP must contain exactly one ROM.")
+            entry = entries[0]
+            extension = Path(entry.filename).suffix.lower()
+            if extension not in supported:
+                raise ValueError("The ROM in this ZIP belongs to the other console.")
+            if not 0 < entry.file_size <= MAX_ARCHIVED_ROM_SIZE:
+                raise ValueError("The ROM in this ZIP is empty or exceeds 32 MiB.")
+            if entry.flag_bits & 1:
+                raise ValueError("Password-protected cartridge ZIPs are unsupported.")
+            with archive.open(entry) as member:
+                data = member.read(MAX_ARCHIVED_ROM_SIZE + 1)
+            if len(data) != entry.file_size:
+                raise ValueError("The ROM in this ZIP could not be read completely.")
+    except (BadZipFile, NotImplementedError, OSError) as error:
+        raise ValueError("Could not read this cartridge ZIP.") from error
+
+    with TemporaryDirectory(prefix="bedroom-cartridge-") as folder:
+        extracted = Path(folder) / ("cartridge" + extension)
+        extracted.write_bytes(data)
+        yield extracted
+
+
+def run_host(port, nonce, core, rom, save, mouse_enabled=False, megadrive=False):
     # Windows socket waits can otherwise round up to the system timer tick.
     timer = c.WinDLL("winmm") if sys.platform == "win32" else None
     timer_active = timer is not None and timer.timeBeginPeriod(1) == 0
@@ -345,7 +392,8 @@ def run_host(port, nonce, core, rom, save, mouse_enabled=False):
             connection.sendall(nonce.encode("ascii"))
             try:
                 LOG.info("Opening core library")
-                Emulator(Path(core), Path(save), mouse_enabled).run(connection, Path(rom))
+                with cartridge_path(Path(rom), megadrive) as cartridge:
+                    Emulator(Path(core), Path(save), mouse_enabled).run(connection, cartridge)
             except (BrokenPipeError, ConnectionResetError):
                 pass
             except Exception as error:
@@ -369,18 +417,19 @@ def main():
         run_host(*arguments)
         return
     port, nonce, core, rom, save, log_path, *options = arguments
-    mouse_enabled = options == ["mouse"]
+    mouse_enabled = "mouse" in options
+    megadrive = "megadrive" in options
     try:
         log_file = open(log_path, "w", encoding="utf-8", buffering=1)
     except OSError:
-        run_host(port, nonce, core, rom, save, mouse_enabled)
+        run_host(port, nonce, core, rom, save, mouse_enabled, megadrive)
         return
     with log_file:
         logging.basicConfig(stream=log_file, level=logging.INFO, format="%(levelname)s %(message)s")
         faulthandler.enable(file=log_file, all_threads=False)
         try:
             LOG.info("Cartridge: %s | Core: %s", Path(rom).name, Path(core).name)
-            run_host(port, nonce, core, rom, save, mouse_enabled)
+            run_host(port, nonce, core, rom, save, mouse_enabled, megadrive)
         except Exception:
             LOG.exception("Emulator host stopped")
             raise

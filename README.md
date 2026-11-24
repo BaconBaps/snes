@@ -16,6 +16,10 @@ Leave a console’s ROM folder blank to play its included homebrew cartridges. T
 
 The ROM folder and preferences are saved in Godot’s per-user data folder. They carry over when you extract an updated project and run it under the same user account.
 
+## ZIP cartridges
+
+Both consoles accept `.zip` cartridges containing exactly one ROM for that console. An archive can include other files such as a readme, but its ROM must use a supported extension. Match the artwork and manual to the archive name, for example `My Game.zip`, `My Game.png` and `My Game.pdf`. Saves and notes are tied to the archive path. ZIPs must be unencrypted and the ROM inside must be at most 32 MiB. Use loose ROM files for ScreenScraper lookups.
+
 ## First-time setup
 
 The wizard opens automatically on a fresh profile. It covers controls and lets you choose separate ROM, cartridge art and PDF manual folders for each console. You can skip any folder or skip setup entirely. Open **Settings → Setup wizard** to return later. Existing profiles can open the wizard from Settings.

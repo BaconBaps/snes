@@ -4,7 +4,7 @@ const TITLES := ["Welcome", "Gamepad controls", "ROM folders", "Cartridge art fo
 const DESCRIPTIONS := [
 	"Set up your SNES and Mega Drive libraries. You can add either console now and come back to Settings → Setup wizard later.",
 	"L2 picks up and drops items. R2 clicks room controls or puts back an item you’re holding. You can also use your mouse.",
-	"Leave a console’s folder blank to play its included homebrew. SNES folders accept .sfc and .smc. Mega Drive folders accept .md, .gen, .bin and .smd.",
+	"Leave a console’s folder blank to play its included homebrew. SNES folders accept .sfc and .smc. Mega Drive folders accept .md, .gen, .bin and .smd. Both accept .zip with one ROM.",
 	"Name each PNG or JPG exactly like its ROM, including any region tags. For example, Sonic (USA).md matches Sonic (USA).png. You can also keep art beside the ROM.",
 	"Match PDF and ROM filenames too. For example, Sonic (USA).pdf matches Sonic (USA).md. PDFs can also sit beside the ROM or in its manuals subfolder.",
 ]

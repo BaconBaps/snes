@@ -80,6 +80,8 @@ func start(rom: String, core_index := 0, use_mouse := false, megadrive := false)
 		nonce.get_string_from_ascii(), core, rom, save, log_path]
 	if use_mouse:
 		arguments.append("mouse")
+	if megadrive:
+		arguments.append("megadrive")
 	process_id = OS.create_process(python, arguments)
 	if process_id <= 0:
 		server.stop()

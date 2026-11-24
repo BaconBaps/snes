@@ -891,7 +891,8 @@ func load_folder(path: String, keep_session := false) -> bool:
 	var files := Array(folder.get_files())
 	files.sort_custom(func(left: String, right: String): return left.naturalnocasecmp_to(right) < 0)
 	for file in files:
-		if file.get_extension().to_lower() in (MD_EXTENSIONS if megadrive else SNES_EXTENSIONS):
+		var extension: String = file.get_extension().to_lower()
+		if extension == "zip" or extension in (MD_EXTENSIONS if megadrive else SNES_EXTENSIONS):
 			titles.append(file.get_basename())
 			rom_paths.append(path.path_join(file))
 	refresh_label_art()
@@ -903,7 +904,7 @@ func load_folder(path: String, keep_session := false) -> bool:
 	reset_lift()
 	message = "Drag a cartridge into the console slot."
 	if titles.is_empty():
-		message = "No Mega Drive ROMs in this folder." if megadrive else "No .sfc or .smc files in this folder."
+		message = "No Mega Drive ROMs in this folder." if megadrive else "No SNES ROMs or cartridge ZIPs in this folder."
 	queue_redraw()
 	return true
 
