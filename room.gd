@@ -188,7 +188,7 @@ var lift := 0.0:
 
 var crt := TextureRect.new()
 var crt_glass := ColorRect.new()
-const INPUT_STATIC_SECONDS := 0.20
+const INPUT_STATIC_SECONDS := 0.80
 var crt_static := ColorRect.new()
 var input_static_timer := Timer.new()
 var input_hiss := AudioStreamPlayer.new()
@@ -467,6 +467,7 @@ func request_console_switch(index: int) -> void:
 		update_crt_static()
 		switch_console(index))
 	console_transition.tween_method(update_console_slide, 1.0, 0.0, 0.40)
+	console_transition.parallel().tween_interval(INPUT_STATIC_SECONDS)
 	console_transition.finished.connect(func():
 		console_transition = null
 		emulator.set_paused(false))
@@ -824,7 +825,7 @@ func setup_crt_static() -> void:
 	input_static_timer.timeout.connect(update_crt_static)
 	add_child(input_static_timer)
 	input_hiss.stream = create_input_hiss()
-	input_hiss.volume_db = -12.0
+	input_hiss.volume_db = -12.0 + linear_to_db(0.5)
 	add_child(input_hiss)
 	update_crt_static()
 
@@ -1446,6 +1447,7 @@ func pull_cartridge_if_moved(point: Vector2) -> void:
 		return
 	if point.distance_squared_to(pull_origin) < 144.0:
 		return
+	last_eject = play_cartridge_sound(eject_sound, EJECT_SOUNDS, last_eject)
 	emulator.stop()
 	inserted = -1
 	seated = false
