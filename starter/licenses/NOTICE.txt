@@ -1,0 +1,26 @@
+Bedroom Gaming Emulator starter cartridges
+
+Gothicvania v1.0.0 (SNES)
+Copyright (c) 2026 Tom D. MIT License, see Gothicvania.txt.
+Unmodified ROM from https://github.com/donth77/snes-homebrew/releases/tag/v1.0.0
+Source and build instructions: https://github.com/donth77/snes-homebrew
+Uses GothicVania Cemetery graphics by Ansimuz (CC0), adapted by Tom D.
+https://ansimuz.itch.io/gothicvania-cemetery
+Uses PVSnesLib 4.5.0, see PVSnesLib-MIT.txt and PVSnesLib.txt.
+Uses SNESMod by mukunda, adapted by KungFuFurby and Alekmaul. See SNESMod.txt.
+https://github.com/alekmaul/pvsneslib/tree/4.5.0
+
+Super Apocalux v1.0 (SNES)
+By DanielTheSilly. GNU General Public License, version 3, see Super-Apocalux.txt.
+The ROM was built from upstream commit 8dc8f280854e491fe4659d6a67088af866724474.
+The complete corresponding game source and build instructions are supplied in
+Super-Apocalux-source.zip alongside this notice.
+https://github.com/DanielTheSilly/Super-Apocalux
+
+Tank Battle build-26 (Mega Drive)
+Copyright (c) 2026 Luis Montes. MIT License, see Tank-Battle.txt.
+Unmodified ROM from https://github.com/monteslu/retro-homebrew-games/releases/tag/build-26
+Source and build instructions: https://github.com/monteslu/retro-homebrew-games/tree/build-26/genesis/tank-battle
+Uses SGDK, see SGDK.txt and https://github.com/Stephane-D/SGDK.
+
+The cartridge labels and player manuals were created for Bedroom Gaming Emulator.

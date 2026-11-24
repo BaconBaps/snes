@@ -42,6 +42,7 @@ def build(godot, core_dir, output):
             destination = portable / script
             destination.parent.mkdir(exist_ok=True)
             shutil.copy2(PROJECT / script, destination)
+        shutil.copytree(PROJECT / "starter" / "licenses", portable / "Starter game licenses")
         included = []
         for name in CORE_NAMES:
             source = core_dir / name
@@ -53,11 +54,13 @@ def build(godot, core_dir, output):
             "Bedroom Gaming Emulator portable build", "",
             "Open Bedroom Gaming Emulator.exe from this extracted folder. Keep the runtime,",
             "emulator, and manuals folders beside it. Python and PDF support are included.",
-            "Choose your own ROM folder. Place a matching PDF beside the ROM or in its manuals subfolder.",
+            "Leave a console's ROM folder blank to play its included homebrew games.",
+            "For your own games, choose a ROM folder and place matching PDFs beside the ROMs.",
             "", "Bundled third-party components",
             "Python: runtime/LICENSE.txt",
             "PDFium/pypdfium2 and Pillow: runtime/packages, in the package license and dist-info folders.",
             "Godot: Godot-LICENSE.txt and Godot-COPYRIGHT.txt.",
+            "Starter games: Starter game licenses/NOTICE.txt, including source for Super Apocalux.",
         ]
         if included:
             notice.extend(["", "Included emulator cores: " + ", ".join(included)])

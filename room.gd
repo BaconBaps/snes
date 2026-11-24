@@ -46,8 +46,10 @@ const MD_PORT_ONE := Rect2(422, 592, 33, 9)
 const MD_PORT_TWO := Rect2(472, 592, 33, 9)
 const MD_EXTENSIONS := ["md", "gen", "bin", "smd"]
 const SNES_EXTENSIONS := ["sfc", "smc"]
-const SNES_DEMOS := ["Star Hopper", "Midnight Rally", "Moon Orchard", "Wave Rider", "Snow Circuit", "Tiny Atlas"]
-const MD_DEMOS := ["Neon Circuit", "Ocean Shift", "Steel Comet", "Night Speedway", "Cosmic Drift", "Skyline Runner"]
+const STARTER_ROMS := [
+	["Gothicvania.sfc", "Super Apocalux.sfc"],
+	["Tank Battle.bin"],
+]
 
 const CART_SIZE := Vector2(160, 84 * 1.15)
 const LABEL_SIZE := Vector2(CART_SIZE.x - 16, 39)
@@ -119,7 +121,7 @@ var setup_complete := false
 var first_run := preload("res://setup/first_run.gd").new()
 var cart_grab_offset := Vector2.ZERO
 var pull_origin := Vector2.ZERO
-var titles := PackedStringArray(SNES_DEMOS)
+var titles := PackedStringArray()
 var rom_paths := PackedStringArray()
 const EmulatorBridge := preload("res://emulator/bridge.gd")
 var console_emulators: Array[EmulatorBridge] = [EmulatorBridge.new(), EmulatorBridge.new()]
@@ -362,14 +364,41 @@ func load_console_library(keep_session := false) -> void:
 	manual.extra_folder = manual_folders[int(megadrive)]
 	rom_folder = md_rom_folder if megadrive else snes_rom_folder
 	art_folder = md_art_folder if megadrive else snes_art_folder
+	titles.clear()
 	rom_paths.clear()
-	titles = PackedStringArray(MD_DEMOS if megadrive else SNES_DEMOS)
-	refresh_label_art()
 	if not rom_folder.is_empty():
-		load_folder(rom_folder, keep_session)
-	else:
-		refresh_shoebox()
-		message = "Drag a cartridge into the console slot."
+		if not load_folder(rom_folder, keep_session):
+			refresh_label_art()
+			refresh_shoebox()
+		return
+	if not keep_session:
+		emulator.stop()
+	var platform := "megadrive" if megadrive else "snes"
+	var bundled := "res://starter/" + platform
+	var destination := ProjectSettings.globalize_path("user://starter/" + platform)
+	if DirAccess.make_dir_recursive_absolute(destination) == OK:
+		for filename: String in STARTER_ROMS[int(megadrive)]:
+			var title := filename.get_basename()
+			var rom := destination.path_join(filename)
+			if install_starter_file(bundled.path_join(filename), rom) and install_starter_file(
+				bundled.path_join(title + ".pdf"), destination.path_join(title + ".pdf")):
+				titles.append(title)
+				rom_paths.append(rom)
+	refresh_label_art()
+	refresh_shoebox()
+	reset_lift()
+	message = "Drag a cartridge into the console slot." if not titles.is_empty() else "Could not load the starter cartridges."
+	queue_redraw()
+
+func install_starter_file(source: String, destination: String) -> bool:
+	var data := FileAccess.get_file_as_bytes(source)
+	if data.is_empty():
+		push_error("Missing starter library file: " + source)
+		return false
+	if FileAccess.get_file_as_bytes(destination) == data:
+		return true
+	var target := FileAccess.open(destination, FileAccess.WRITE)
+	return target != null and target.store_buffer(data)
 
 func switch_console(index: int) -> void:
 	if megadrive == (index == 1):
@@ -844,12 +873,12 @@ func update_glass_sheen() -> void:
 		strength *= 0.22
 	crt_glass.material.set_shader_parameter("sheen_strength", strength)
 
-func load_folder(path: String, keep_session := false) -> void:
+func load_folder(path: String, keep_session := false) -> bool:
 	var folder := DirAccess.open(path)
 	if folder == null:
 		message = "That folder could not be opened."
 		queue_redraw()
-		return
+		return false
 	if path != rom_folder:
 		rom_folder = path
 		save_preferences()
@@ -876,6 +905,7 @@ func load_folder(path: String, keep_session := false) -> void:
 	if titles.is_empty():
 		message = "No Mega Drive ROMs in this folder." if megadrive else "No .sfc or .smc files in this folder."
 	queue_redraw()
+	return true
 
 func load_art_folder(path: String) -> void:
 	if not DirAccess.dir_exists_absolute(path):
@@ -890,6 +920,10 @@ func load_art_folder(path: String) -> void:
 func refresh_label_art() -> void:
 	art_paths = index_label_images(art_folder)
 	sidecar_paths = index_label_images(rom_folder)
+	if rom_folder.is_empty():
+		var platform := "megadrive" if megadrive else "snes"
+		for title in titles:
+			sidecar_paths[title.to_lower()] = "res://starter/%s/%s.png" % [platform, title]
 	label_textures.clear()
 	end_label_palettes.clear()
 
@@ -916,7 +950,14 @@ func cartridge_label_texture(index: int) -> Texture2D:
 		for path in [art_paths.get(title, ""), sidecar_paths.get(title, ""), LocalRuntime.scraped_label(rom_paths[index])]:
 			if path.is_empty():
 				continue
-			if image.load(path) == OK and not image.is_empty():
+			if path.begins_with("res://"):
+				var bundled_label := load(path) as Texture2D
+				if bundled_label == null:
+					continue
+				image = bundled_label.get_image()
+			elif image.load(path) != OK:
+				continue
+			if not image.is_empty():
 				if megadrive:
 					end_label_palettes[title] = sample_end_label_palette(image)
 				prepare_label_image(image)

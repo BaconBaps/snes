@@ -1,6 +1,8 @@
 .godot/
 *.sfc
 *.smc
+!starter/snes/Gothicvania.sfc
+!starter/snes/Super Apocalux.sfc
 emulator/snes9x_libretro.dll
 emulator/snes9x_libretro.so
 __pycache__/
