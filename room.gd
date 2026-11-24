@@ -174,6 +174,11 @@ var page_label := Label.new()
 var alphabet_button := MenuButton.new()
 var message := "Drag a cartridge into the console slot."
 var eject_animation: Tween
+var insertion_animation: Tween
+var insertion_position := Vector2.ZERO:
+	set(value):
+		insertion_position = value
+		queue_redraw()
 var lift := 0.0:
 	set(value):
 		lift = value
@@ -961,6 +966,9 @@ func prepare_label_image(image: Image) -> void:
 					image.set_pixel(corner_x, corner_y, pixel)
 
 func reset_lift() -> void:
+	if insertion_animation:
+		insertion_animation.kill()
+		insertion_animation = null
 	if eject_animation:
 		eject_animation.kill()
 	lift = 0.0
@@ -1309,7 +1317,7 @@ func press_at(point: Vector2) -> void:
 		eject_animation = create_tween()
 		eject_animation.tween_property(self, "lift", minf(CART_SIZE.y - SEATED_CART_HEIGHT + 2.0, console_position().y - SCREEN.end.y - 5.0), 0.17).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		message = "Drag the ejected cartridge back to the shoebox."
-	elif inserted >= 0 and not seated and Rect2(console_position(), Vector2(CART_SIZE.x, console_cartridge_height())).has_point(point):
+	elif inserted >= 0 and not seated and not insertion_animation and Rect2(console_position(), Vector2(CART_SIZE.x, console_cartridge_height())).has_point(point):
 		dragging = inserted
 	elif inserted < 0:
 		dragging = desk_cartridge_at(point)
@@ -1348,8 +1356,48 @@ func cartridge_edge_meets_slot(point: Vector2) -> bool:
 	var slot := MD_SLOT if megadrive else SLOT
 	var cart := Rect2(dragged_cartridge_position(point), cartridge_size())
 	var overlap := minf(cart.end.x, slot.end.x) - maxf(cart.position.x, slot.position.x)
-	var edge_near_slot := cart.end.y >= slot.position.y - 10.0 and cart.end.y <= slot.end.y + 10.0
+	var seated_height := MD_SEATED_HEIGHT if megadrive else SEATED_CART_HEIGHT
+	var travel := cart.size.y - seated_height
+	var edge_near_slot := cart.end.y >= slot.position.y - 10.0 and cart.end.y <= slot.end.y + travel + 12.0
 	return edge_near_slot and overlap >= cart.size.x * 0.6
+
+func cartridge_slot_pose(point: Vector2) -> Vector2:
+	var slot := MD_SLOT if megadrive else SLOT
+	var at := dragged_cartridge_position(point)
+	var bottom := at.y + cartridge_size().y
+	var alignment := smoothstep(slot.position.y - 6.0, slot.end.y + 4.0, bottom)
+	at.x = lerpf(at.x, slot.get_center().x - cartridge_size().x * 0.5, alignment)
+	var seated_height := MD_SEATED_HEIGHT if megadrive else SEATED_CART_HEIGHT
+	at.y = minf(at.y, slot.end.y - seated_height)
+	return at
+
+func cartridge_drag_at_slot() -> bool:
+	return dragging >= 0 and not seated and cartridge_edge_meets_slot(pointer)
+
+func slot_flap_opening() -> float:
+	if insertion_animation or cartridge_drag_at_slot():
+		var slot := MD_SLOT if megadrive else SLOT
+		var at := insertion_position if insertion_animation else cartridge_slot_pose(pointer)
+		return smoothstep(slot.position.y + 1.0, slot.end.y + 5.0, at.y + cartridge_size().y)
+	return 1.0 if inserted >= 0 and dragging != inserted else 0.0
+
+func draw_slot_cartridge() -> void:
+	var slot := MD_SLOT if megadrive else SLOT
+	if insertion_animation or cartridge_drag_at_slot():
+		var at := insertion_position if insertion_animation else cartridge_slot_pose(pointer)
+		var index := inserted if insertion_animation else dragging
+		cartridge(index, at, minf(cartridge_size().y, slot.end.y - at.y))
+	elif inserted >= 0 and inserted != dragging:
+		cartridge(inserted, console_position(), console_cartridge_height())
+
+func finish_insertion() -> void:
+	insertion_animation = null
+	seated = true
+	last_insert = play_cartridge_sound(insert_sound, INSERT_SOUNDS, last_insert)
+	if inserted < rom_paths.size():
+		manual.set_rom(rom_paths[inserted])
+	start_cartridge()
+	queue_redraw()
 
 func pull_cartridge_if_moved(point: Vector2) -> void:
 	if not megadrive or not seated or dragging != inserted or dragging < 0:
@@ -1373,12 +1421,13 @@ func drop_at(point: Vector2) -> void:
 		return
 	if cartridge_edge_meets_slot(point):
 		inserted = dragging
-		seated = true
+		seated = false
 		reset_lift()
-		last_insert = play_cartridge_sound(insert_sound, INSERT_SOUNDS, last_insert)
-		if inserted < rom_paths.size():
-			manual.set_rom(rom_paths[inserted])
-		start_cartridge()
+		insertion_position = cartridge_slot_pose(point)
+		insertion_animation = create_tween()
+		insertion_animation.tween_property(self, "insertion_position", console_position(), 0.18) \
+			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		insertion_animation.finished.connect(finish_insertion)
 	elif dragging == inserted and DESK.has_point(point):
 		inserted = -1
 		reset_lift()
@@ -1963,25 +2012,16 @@ func draw_console() -> void:
 	set_prop_matrix(CONSOLE_TRANSFORM)
 	draw_texture_rect(preload("res://art/pal-console-shell.png"), Rect2(272, 494, 289, 114), false)
 
-	# The top hatch sits behind the three controls, with its lip in front of the cartridge.
+	# The rear hinge stays fixed as the front of the flap drops into the slot.
+	var opening := slot_flap_opening()
 	rounded(SLOT_ART.grow(4), 8, "#928c96")
-	rounded(SLOT_ART, 6, "#a8a3ac" if seated else "#292634")
-	if inserted < 0 or dragging == inserted:
-		rounded(SLOT_ART.grow(-2), 5, "#666373", "#a5a0aa")
-		for x in [SLOT_ART.position.x + 10, SLOT_ART.end.x - 10]:
-			line(Vector2(x, SLOT_ART.position.y + 3.5), Vector2(x, SLOT_ART.end.y - 3.5), "#494653")
-		draw_console_caption("P A L   V E R S I O N",
-			Vector2(SLOT_ART.get_center().x - 49.5, SLOT_ART.position.y + 8.4), 99, 6, "#e4dce2")
-		var arrow := Vector2(SLOT_ART.get_center().x, SLOT_ART.end.y - 4.0)
-		shape([arrow + Vector2(-3.5, 0), arrow + Vector2(3.5, 0), arrow + Vector2(0, 2)], "#a7a0ad")
-	if dragging >= 0 and cartridge_edge_meets_slot(pointer):
-		rounded(SLOT_ART.grow(3), 7, "#eab58975", "#ffdfad")
-	if inserted >= 0 and inserted != dragging:
-		set_prop_transform(Vector2.ZERO)
-		# At rest the slot hides the shell immediately below the label.
-		cartridge(inserted, console_position(), console_cartridge_height())
-		set_prop_matrix(CONSOLE_TRANSFORM)
-	draw_texture_rect(preload("res://art/pal-console-slot-lip.png"), Rect2(SLOT_ART.position.x - 7.0, SLOT_ART.end.y - 3.0, SLOT_ART.size.x + 14.0, 7.0), false)
+	rounded(SLOT_ART, 6, "#292634")
+	draw_snes_flap(opening)
+	set_prop_transform(Vector2.ZERO)
+	if not insertion_animation and not cartridge_drag_at_slot():
+		draw_slot_cartridge()
+	draw_snes_slot_lip()
+	set_prop_matrix(CONSOLE_TRANSFORM)
 
 	draw_console_button(Rect2(321, 548, 39, BUTTON_HEIGHT), "POWER", "#575465")
 	var switch_y := 553 if powered else 558
@@ -1992,21 +2032,38 @@ func draw_console() -> void:
 	draw_console_wordmark()
 	set_prop_transform(Vector2.ZERO)
 
+func draw_snes_slot_lip() -> void:
+	set_prop_matrix(CONSOLE_TRANSFORM)
+	prop_canvas.draw_texture_rect(preload("res://art/pal-console-slot-lip.png"),
+		Rect2(SLOT_ART.position.x - 7.0, SLOT_ART.end.y - 3.0, SLOT_ART.size.x + 14.0, 7.0), false)
+	set_prop_transform(Vector2.ZERO)
+
+func draw_snes_flap(opening: float) -> void:
+	var flap := SLOT_ART.grow(-2.0)
+	var compression := lerpf(1.0, 0.19, opening)
+	var flap_matrix := CONSOLE_TRANSFORM * Transform2D(0.0, Vector2(1.0, compression), 0.0, flap.position)
+	set_prop_matrix(flap_matrix)
+	rounded(Rect2(Vector2.ZERO, flap.size), 4, "#666373", "#a5a0aa")
+	for x in [8.0, flap.size.x - 8.0]:
+		line(Vector2(x, 1.5), Vector2(x, flap.size.y - 1.5), "#494653")
+	set_prop_matrix(flap_matrix * Transform2D(0.0, Vector2(1.0, 0.51), 0.0, Vector2(0, 6.4)))
+	draw_string(ThemeDB.fallback_font, Vector2.ZERO, "P A L   V E R S I O N",
+		HORIZONTAL_ALIGNMENT_CENTER, int(flap.size.x), 6, Color("#e4dce2"))
+	set_prop_matrix(flap_matrix)
+	var arrow := Vector2(flap.size.x * 0.5, flap.size.y - 3)
+	shape([arrow + Vector2(-3, 0), arrow + Vector2(3, 0), arrow + Vector2(0, 1.6)], "#a7a0ad")
+	set_prop_matrix(CONSOLE_TRANSFORM)
+
 func draw_megadrive_console() -> void:
 	glow(Vector2(412, 594), Vector2(171, 20), Color("#16121fbf"))
 	draw_texture_rect(MD_SHELL, Rect2(239.35, 446, 347.3, 159), false)
 	rounded(MD_SLOT.grow(2), 7, "#282531", "#61596a")
 	rounded(MD_SLOT, 6, "#100f19", "#171620")
-	if not seated:
-		var flap := Rect2(MD_SLOT.position + Vector2(8, 3), MD_SLOT.size - Vector2(16, 7))
-		rounded(flap, 3, "#1c1b28", "#383443")
-		line(flap.position + Vector2(5, 1), Vector2(flap.end.x - 5, flap.position.y + 1), "#625a6b")
-		line(Vector2(flap.position.x + 7, flap.end.y - 1), flap.end - Vector2(7, 1), "#100e17")
-	if dragging >= 0 and not seated and cartridge_edge_meets_slot(pointer):
-		rounded(MD_SLOT.grow(2), 7, "#40353d", "#e9bb87")
-	if inserted >= 0:
-		cartridge(inserted, console_position(), MD_SEATED_HEIGHT)
-		line(MD_SLOT.position + Vector2(5, 14), MD_SLOT.end - Vector2(5, 0), "#292531", 2)
+	var opening := slot_flap_opening()
+	draw_megadrive_flaps(opening, false)
+	if not insertion_animation and not cartridge_drag_at_slot():
+		draw_slot_cartridge()
+	draw_megadrive_slot_lip(opening)
 
 	var slider := Rect2(304, 524, 32, 12)
 	rounded(slider.grow(1), 3, "#2b2433", "#6e6373")
@@ -2050,6 +2107,19 @@ func draw_megadrive_console() -> void:
 			draw_circle(port.position + Vector2(7 + 4.7 * column, 3.4), 0.65, Color("#a79ba5"), true, -1, true)
 		for column in range(4):
 			draw_circle(port.position + Vector2(9.5 + 4.7 * column, 6.1), 0.55, Color("#827784"), true, -1, true)
+
+func draw_megadrive_slot_lip(opening: float) -> void:
+	draw_megadrive_flaps(opening, true)
+	line(MD_SLOT.position + Vector2(5, 14), MD_SLOT.end - Vector2(5, 0), "#292531", 2)
+
+func draw_megadrive_flaps(opening: float, front: bool) -> void:
+	# Each half pivots toward its own edge, opening a seam in the middle.
+	var x := MD_SLOT.position.x + 7.0
+	var hinge_y := MD_SLOT.end.y - 1.0 if front else MD_SLOT.position.y + 1.0
+	var span := lerpf(MD_SLOT.size.y * 0.5 - 1.0, 1.4, opening)
+	var flap := Rect2(x, hinge_y - span if front else hinge_y, MD_SLOT.size.x - 14.0, span)
+	rounded(flap, 2, "#252331" if front else "#33303e", "#191822")
+	line(flap.position + Vector2(5, 0.5), Vector2(flap.end.x - 5, flap.position.y + 0.5), "#626071")
 
 func draw_console_wordmark() -> void:
 	var font := ThemeDB.fallback_font
@@ -2122,7 +2192,7 @@ func set_prop_transform(origin: Vector2, rotation := 0.0, scale := Vector2.ONE) 
 	prop_canvas.draw_set_transform(origin + prop_draw_offset, rotation, scale)
 
 func set_prop_matrix(matrix: Transform2D) -> void:
-	draw_set_transform_matrix(matrix.translated(prop_draw_offset))
+	prop_canvas.draw_set_transform_matrix(matrix.translated(prop_draw_offset))
 
 func _draw() -> void:
 	draw_bedroom()
@@ -2160,7 +2230,13 @@ func draw_dragged_prop() -> void:
 	if dragging_plug:
 		var cable_end := Vector2(SECOND_CABLE_EXIT_X, get_viewport_rect().end.y + 6.0)
 		draw_controller_plug(player_two_plug_position(), cable_end)
-	if dragging >= 0 and not (megadrive and seated and dragging == inserted):
+	if insertion_animation or cartridge_drag_at_slot():
+		draw_slot_cartridge()
+		if megadrive:
+			draw_megadrive_slot_lip(slot_flap_opening())
+		else:
+			draw_snes_slot_lip()
+	elif dragging >= 0 and not (megadrive and seated and dragging == inserted):
 		cartridge(dragging, dragged_cartridge_position(pointer))
 	prop_canvas = self
 
