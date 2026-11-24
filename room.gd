@@ -1997,38 +1997,59 @@ func draw_console() -> void:
 func draw_megadrive_console() -> void:
 	glow(Vector2(412, 594), Vector2(171, 20), Color("#16121fbf"))
 	draw_texture_rect(MD_SHELL, Rect2(239.35, 446, 347.3, 159), false)
-	rounded(MD_SLOT.grow(2), 7, "#393540", "#5c5363")
-	rounded(MD_SLOT, 6, "#100f17", "#16131d")
+	rounded(MD_SLOT.grow(2), 7, "#282531", "#61596a")
+	rounded(MD_SLOT, 6, "#100f19", "#171620")
 	if not seated:
-		line(MD_SLOT.position + Vector2(8, 8), Vector2(MD_SLOT.end.x - 8, MD_SLOT.position.y + 8), "#494350", 2)
+		var flap := Rect2(MD_SLOT.position + Vector2(8, 3), MD_SLOT.size - Vector2(16, 7))
+		rounded(flap, 3, "#1c1b28", "#383443")
+		line(flap.position + Vector2(5, 1), Vector2(flap.end.x - 5, flap.position.y + 1), "#625a6b")
+		line(Vector2(flap.position.x + 7, flap.end.y - 1), flap.end - Vector2(7, 1), "#100e17")
 	if dragging >= 0 and not seated and cartridge_edge_meets_slot(pointer):
 		rounded(MD_SLOT.grow(2), 7, "#40353d", "#e9bb87")
 	if inserted >= 0:
 		cartridge(inserted, console_position(), MD_SEATED_HEIGHT)
 		line(MD_SLOT.position + Vector2(5, 14), MD_SLOT.end - Vector2(5, 0), "#292531", 2)
 
-	for y in range(463, 517, 4):
-		var slope := (y - 463) * 0.31
-		line(Vector2(281 - slope, y), Vector2(323 - slope, y), "#15121b", 2)
-		line(Vector2(281 - slope, y + 1.5), Vector2(323 - slope, y + 1.5), "#4b4455")
 	var slider := Rect2(320, 524, 32, 12)
-	rounded(slider, 3, "#18151e", "#565061")
-	var switch_x := 325.0 if powered else 338.0
-	rounded(Rect2(switch_x, 526, 9, 8), 2, "#58505c", "#78707a")
-	line(Vector2(switch_x + 3, 527), Vector2(switch_x + 3, 533), "#b24e56")
-	words("POWER", 322, 545, 7)
-	rounded(MD_RESET.grow(1), 3, "#201c29", "#5e5665")
-	rounded(MD_RESET.grow(-1), 2, "#fff0dc" if MD_RESET.has_point(pointer) and seated else "#d7cfc5")
-	for x in range(323, 348, 4):
-		line(Vector2(x, 554), Vector2(x, 557), "#afa6a4")
-	words("RESET", 323, 571, 7)
-	draw_string(ThemeDB.fallback_font, Vector2(422, 535), "16-BIT", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("#f2d394"))
-	draw_circle(Vector2(447, 550), 3.25, Color("#483b44"), true, -1, true)
-	words("MEGA DRIVE", 470, 575, 9)
+	rounded(slider.grow(1), 3, "#2b2433", "#6e6373")
+	rounded(slider, 2, "#14131d", "#16141f")
+	var switch_x := 324.0 if powered else 338.0
+	var toggle := Rect2(switch_x, 525, 10, 10)
+	rounded(toggle, 2, "#3e3545", "#635a69")
+	gradient(toggle.grow(-1.5), "#7a6e7d", "#252330")
+	line(toggle.position + Vector2(4, 1), toggle.position + Vector2(4, 8), "#bc6867")
+	words("ON", 321, 541, 4)
+	words("OFF", 343, 541, 4)
+	words("POWER", 323, 547, 6)
+	words("VOL", 294, 569, 5)
+	rounded(MD_RESET.grow(1), 3, "#201c29", "#726774")
+	var reset_cap := MD_RESET.grow(-1.5)
+	rounded(reset_cap, 2, "#fff0dc" if MD_RESET.has_point(pointer) and seated else "#c6bdb6")
+	gradient(reset_cap.grow(-1.0), "#fff4e5" if MD_RESET.has_point(pointer) and seated else "#f3e6d5", "#b0a29d")
+	for x in range(324, 348, 4):
+		for y in [554.0, 557.0]:
+			draw_circle(Vector2(x, y), 0.6, Color("#81747c"), true, -1, true)
+	words("RESET", 324, 571, 6)
+
+	var font := ThemeDB.fallback_font
+	var badge_position := Vector2(413, 535)
+	draw_string(font, badge_position + Vector2(0, 1), "16-BIT", HORIZONTAL_ALIGNMENT_CENTER, 68, 17, Color("#715741"))
+	draw_string(font, badge_position, "16-BIT", HORIZONTAL_ALIGNMENT_CENTER, 68, 17, Color("#f0d292"))
+	draw_string(font, Vector2(425, 551), "POWER", HORIZONTAL_ALIGNMENT_LEFT, -1, 4, Color("#524451"))
+	draw_string(font, Vector2(457, 551), "ON", HORIZONTAL_ALIGNMENT_LEFT, -1, 4, Color("#524451"))
+	draw_circle(Vector2(447, 550), 3.25, Color("#66565c"), true, -1, true)
+	draw_circle(Vector2(447, 550), 2.45, Color("#30232e"), true, -1, true)
+	draw_string(font, Vector2(474, 575), "MEGA DRIVE", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color("#d5c5d4"))
+	draw_string(font, Vector2(531, 575), "SEGA", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color("#e6d7e2"))
 	for port in [MD_PORT_ONE, MD_PORT_TWO]:
-		rounded(port, 3, "#121017", "#514a59")
-		for x in range(5):
-			draw_circle(port.position + Vector2(6 + 5 * x, 4), 0.8, Color("#746775"), true, -1, true)
+		rounded(port.grow(1), 3, "#181620", "#635767")
+		shape([port.position + Vector2(2, 1), port.position + Vector2(31, 1),
+			port.position + Vector2(27, 8), port.position + Vector2(6, 8)], "#0e0d16")
+		line(port.position + Vector2(4, 2), port.position + Vector2(29, 2), "#706573")
+		for column in range(5):
+			draw_circle(port.position + Vector2(7 + 4.7 * column, 3.4), 0.65, Color("#a79ba5"), true, -1, true)
+		for column in range(4):
+			draw_circle(port.position + Vector2(9.5 + 4.7 * column, 6.1), 0.55, Color("#827784"), true, -1, true)
 
 func draw_console_wordmark() -> void:
 	var font := ThemeDB.fallback_font

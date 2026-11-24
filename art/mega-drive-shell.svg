@@ -1,33 +1,102 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="347.3" height="159" viewBox="-22.65 0 347.3 159">
   <defs>
-    <linearGradient id="case" x2=".22" y2="1" gradientUnits="objectBoundingBox">
-      <stop stop-color="#4b4755"/><stop offset=".44" stop-color="#2b2933"/><stop offset="1" stop-color="#1d1b25"/>
+    <linearGradient id="cabinet" x1="0" y1="0" x2=".68" y2="1">
+      <stop stop-color="#50505b"/><stop offset=".23" stop-color="#3b3a45"/>
+      <stop offset=".61" stop-color="#272632"/><stop offset="1" stop-color="#1a1923"/>
     </linearGradient>
-    <linearGradient id="front" x2="0" y2="1" gradientUnits="objectBoundingBox">
-      <stop stop-color="#383442"/><stop offset=".48" stop-color="#24212c"/><stop offset="1" stop-color="#14121a"/>
+    <linearGradient id="front" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#181721"/><stop offset=".45" stop-color="#282631"/>
+      <stop offset=".69" stop-color="#35323d"/><stop offset=".83" stop-color="#26242e"/>
+      <stop offset="1" stop-color="#13121b"/>
     </linearGradient>
-    <linearGradient id="disc" x2=".24" y2="1" gradientUnits="objectBoundingBox">
-      <stop stop-color="#494651"/><stop offset=".54" stop-color="#282630"/><stop offset="1" stop-color="#17151e"/>
+    <linearGradient id="lip" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#45404e" stop-opacity="0"/><stop offset=".36" stop-color="#615869"/>
+      <stop offset=".62" stop-color="#36313f"/><stop offset="1" stop-color="#1a1823"/>
     </linearGradient>
-    <linearGradient id="facet" x2="0" y2="1" gradientUnits="objectBoundingBox">
-      <stop stop-color="#393642"/><stop offset="1" stop-color="#211e29"/>
+    <linearGradient id="right-bevel" x1="0" y1="0" x2="1" y2="0">
+      <stop stop-color="#2c2936"/><stop offset=".72" stop-color="#4f4657"/>
+      <stop offset="1" stop-color="#302938"/>
+    </linearGradient>
+    <linearGradient id="facet" x1=".05" y1="0" x2=".85" y2="1">
+      <stop stop-color="#555060"/><stop offset=".18" stop-color="#34313f"/>
+      <stop offset=".65" stop-color="#282633"/><stop offset="1" stop-color="#1c1a25"/>
+    </linearGradient>
+    <linearGradient id="ring-wall" x1="0" y1="0" x2="1" y2=".25">
+      <stop stop-color="#171722"/><stop offset=".18" stop-color="#5c5868"/>
+      <stop offset=".38" stop-color="#373544"/><stop offset=".77" stop-color="#262331"/>
+      <stop offset="1" stop-color="#13121c"/>
+    </linearGradient>
+    <linearGradient id="gloss" x1=".07" y1="0" x2=".9" y2=".87">
+      <stop stop-color="#797383"/><stop offset=".18" stop-color="#343343"/>
+      <stop offset=".38" stop-color="#181823"/><stop offset=".59" stop-color="#514955"/>
+      <stop offset=".74" stop-color="#2b2835"/><stop offset="1" stop-color="#16141f"/>
+    </linearGradient>
+    <linearGradient id="disc" x1=".18" y1="0" x2=".65" y2="1">
+      <stop stop-color="#54525e"/><stop offset=".30" stop-color="#3d3b48"/>
+      <stop offset=".70" stop-color="#30303c"/><stop offset="1" stop-color="#22212e"/>
+    </linearGradient>
+    <linearGradient id="badge" x1="0" y1="0" x2=".28" y2="1">
+      <stop stop-color="#494552"/><stop offset=".31" stop-color="#33303e"/>
+      <stop offset=".61" stop-color="#1d1b28"/><stop offset="1" stop-color="#302936"/>
+    </linearGradient>
+    <linearGradient id="inlay" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#ddd2bd"/><stop offset=".55" stop-color="#bdb29f"/><stop offset="1" stop-color="#908585"/>
+    </linearGradient>
+    <linearGradient id="well" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#15131d"/><stop offset=".5" stop-color="#23212d"/><stop offset="1" stop-color="#32303c"/>
+    </linearGradient>
+    <linearGradient id="volume-cap" x1="0" y1="0" x2=".28" y2="1">
+      <stop stop-color="#686170"/><stop offset=".26" stop-color="#514957"/>
+      <stop offset=".6" stop-color="#36313e"/><stop offset="1" stop-color="#1a1824"/>
     </linearGradient>
   </defs>
+
+  <!-- The broad moulded base and its separate lower case. -->
   <g transform="translate(-22.65 0) scale(1.15 1)">
-    <path d="M5 120L34 20q3-9 12-9h216q10 0 14 10l20 100 3 18q1 14-16 17H19Q3 155 3 142z" fill="url(#front)" stroke="#15131d" stroke-width="2"/>
-    <path d="M5 120L34 20q3-9 12-9h216q10 0 14 10l20 100q3 13-14 14H20q-16 0-15-15z" fill="url(#case)" stroke="#575162" stroke-width="1.5"/>
-    <path d="M13 113l15-34h63l24 26h130l17-26h25l9 42q2 11-14 12H19q-14 0-11-10z" fill="url(#facet)"/>
-    <path d="M16 137q2 4 10 4h247q12 0 16-4" fill="none" stroke="#514858" stroke-opacity=".62"/>
+    <path d="M5 120 34 20q3-9 12-9h216q10 0 14 10l20 100 3 18q1 14-16 17H19Q3 155 3 142Z" fill="url(#front)" stroke="#15131d" stroke-width="2"/>
+    <path d="M5 120 34 20q3-9 12-9h216q10 0 14 10l20 100q3 13-14 14H20q-16 0-15-15Z" fill="url(#cabinet)" stroke="#5b5263" stroke-width="1.2"/>
+    <path d="M265 12q8 3 11 10l20 99q2 9-8 12l-9-9-19-108Z" fill="url(#right-bevel)"/>
+    <path d="M9 117 23 82l9-6h64q13 0 24 11l20 18h100q13-8 28-28h18l10 43q3 12-14 14H20q-15 0-11-17Z" fill="url(#facet)"/>
+    <path d="M16 112q-6 12 6 13h248q13 0 20-5l3 8q-2 7-15 7H20q-15 0-14-9Z" fill="url(#lip)"/>
+    <path d="M13 137q4 5 14 5h244q14 0 22-5" fill="none" stroke="#17141e" stroke-width="1.25"/>
+    <path d="M17 139q5 4 13 4h240q13 0 20-4" fill="none" stroke="#766678" stroke-opacity=".55" stroke-width=".65"/>
+    <path d="M19 152h265" fill="none" stroke="#15121b" stroke-width=".9"/>
+    <path d="M45 13h214" fill="none" stroke="#948396" stroke-opacity=".48" stroke-width=".85"/>
+    <path d="M13 119 36 27" fill="none" stroke="#b6a1a7" stroke-opacity=".18" stroke-width="1"/>
   </g>
-  <path d="M18 20q1-5 7-6h43L48 71H1z" fill="#24212b" stroke="#16131d"/>
-  <ellipse cx="185" cy="63" rx="93" ry="61" fill="#16141d"/>
-  <ellipse cx="185" cy="58" rx="92" ry="57" fill="url(#disc)" stroke="#56505f" stroke-width="1.5"/>
-  <ellipse cx="185" cy="58" rx="81" ry="51" fill="none" stroke="#191720" stroke-width="1.3"/>
-  <path d="M135 71q46-18 98 0l4 23q-51 25-107 2z" fill="#1a1821" stroke="#4c4654"/>
-  <path d="M132 93q53 19 104-1l2 12q-52 20-108 0z" fill="#d0c4ad"/>
-  <path d="M133 93q52 17 103-1" stroke="#eee2c9" fill="none" stroke-opacity=".58"/>
-  <path d="M28 91h10l-5 29H22z" fill="#121019" stroke="#494353"/>
-  <path d="M26 104l10 1-1 5-10-1z" fill="#4e4859"/>
-  <path d="M22 144h16" stroke="#111018" stroke-width="4" stroke-linecap="round"/>
-  <circle cx="26" cy="144" r="2.2" fill="#4b4554"/>
+
+  <!-- Vents follow the left edge and pick up light on the front of each rib. -->
+  <path d="M18 21q1-6 7-7h44l-19 57H1Z" fill="#111119" stroke="#25232d"/>
+  <path d="M20 20 4 69h46l16-52H24Z" fill="#1d1b27"/>
+  <path d="M19 17h46M18 21h46M17 25h46M16 29h46M14 33h46M13 37h46M12 41h46M11 45h46M9 49h46M8 53h46M7 57h46M6 61h46M4 65h46M3 69h46" fill="none" stroke="#0f1018" stroke-width="2.3" stroke-linecap="round"/>
+  <path d="M19 18h46M18 22h46M17 26h46M16 30h46M14 34h46M13 38h46M12 42h46M11 46h46M9 50h46M8 54h46M7 58h46M6 62h46M4 66h46M3 70h46" fill="none" stroke="#686174" stroke-opacity=".74" stroke-width=".7" stroke-linecap="round"/>
+
+  <!-- The stepped cartridge deck casts its own contact shadow. -->
+  <ellipse cx="185" cy="68" rx="95" ry="60" fill="#15121d" opacity=".84"/>
+  <path d="M92 57h186v11c0 33-42 58-93 58s-93-26-93-58Z" fill="url(#ring-wall)" stroke="#171520" stroke-width=".9"/>
+  <ellipse cx="185" cy="58" rx="93.4" ry="57.4" fill="url(#gloss)" stroke="#807485" stroke-width="1"/>
+  <ellipse cx="185" cy="58" rx="82.6" ry="50.1" fill="url(#disc)" stroke="#171721" stroke-width="1.35"/>
+  <path d="M101 47q10-26 47-39 34-12 76 0" fill="none" stroke="#aa9aab" stroke-opacity=".45" stroke-width=".9" stroke-linecap="round"/>
+  <path d="M94 69q7 23 33 35" fill="none" stroke="#a28c9b" stroke-opacity=".32" stroke-width="1.15"/>
+  <path d="M104 74q11 19 34 28" fill="none" stroke="#897481" stroke-opacity=".22" stroke-width="2"/>
+  <path d="M204 113q39-4 62-26" fill="none" stroke="#ae7e92" stroke-opacity=".24" stroke-width="1"/>
+  <path d="M109 42q2-9 17-12 50-9 116 0 16 3 19 13l-4 7H113Z" fill="#1e1c27" stroke="#605969" stroke-width=".65"/>
+
+  <!-- Raised 16-bit badge and the curved power inlay. -->
+  <path d="M138 69q1-4 5-5 42-8 86 0 5 1 6 5l4 33q-52 24-105 0Z" fill="#14121d" stroke="#13121b" stroke-width="1.7"/>
+  <path d="M139 69q1-3 5-4 40-7 84 0 5 1 6 5l3 28q-50 22-102 0Z" fill="url(#badge)" stroke="#5e5261" stroke-width=".72"/>
+  <path d="M135 95q52 18 101 0l2 13q-51 21-105 0Z" fill="url(#inlay)" stroke="#544b56" stroke-width=".55"/>
+  <path d="M136 95q51 17 100 0" fill="none" stroke="#f0deca" stroke-opacity=".76" stroke-width=".65"/>
+
+  <!-- Recessed controls, volume track, and headphone jack. -->
+  <path d="M39 75h56q8 1 7 8l-5 43H32l-4-3 7-43q1-4 4-5Z" fill="#201d29" stroke="#655969" stroke-width=".65"/>
+  <path d="M40 77h53q7 0 6 5l-6 41H33l6-43Z" fill="url(#well)"/>
+  <path d="M39 83h12l-5 33H34Z" fill="#13111a" stroke="#545060" stroke-width=".55"/>
+  <path d="M34 85h-3m2 6h-3m2 6h-3m2 6h-3m2 6h-3" fill="none" stroke="#aa98a6" stroke-opacity=".65" stroke-width=".7"/>
+  <path d="M35 103q6-2 12 0l-2 9q-6 3-12 0Z" fill="url(#volume-cap)" stroke="#726273" stroke-width=".65"/>
+  <path d="M36 104h9" fill="none" stroke="#b67a79" stroke-width=".7"/>
+  <ellipse cx="56" cy="148" rx="4.2" ry="3.1" fill="#101018" stroke="#82717b" stroke-width=".75"/>
+  <ellipse cx="56" cy="148" rx="2.25" ry="1.55" fill="#08080e"/>
+  <path d="M53 147q3-2 6 0" fill="none" stroke="#c3a69c" stroke-opacity=".65" stroke-width=".65"/>
+  <path d="M154 145q1-3 5-3h89q4 0 5 3l-3 8h-93Z" fill="#25222e" stroke="#514758" stroke-width=".65"/>
 </svg>
