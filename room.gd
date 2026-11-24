@@ -191,7 +191,6 @@ var crt_glass := ColorRect.new()
 const INPUT_STATIC_SECONDS := 0.80
 var crt_static := ColorRect.new()
 var input_static_timer := Timer.new()
-var input_hiss := AudioStreamPlayer.new()
 var room_dimmer := ColorRect.new()
 var room_overlay := Node2D.new()
 var dragged_prop_layer := Node2D.new()
@@ -463,7 +462,6 @@ func request_console_switch(index: int) -> void:
 	console_transition.tween_method(update_console_slide, 0.0, 1.0, 0.36)
 	console_transition.tween_callback(func():
 		input_static_timer.start()
-		input_hiss.play()
 		update_crt_static()
 		switch_console(index))
 	console_transition.tween_method(update_console_slide, 1.0, 0.0, 0.40)
@@ -824,29 +822,7 @@ func setup_crt_static() -> void:
 	input_static_timer.wait_time = INPUT_STATIC_SECONDS
 	input_static_timer.timeout.connect(update_crt_static)
 	add_child(input_static_timer)
-	input_hiss.stream = create_input_hiss()
-	input_hiss.volume_db = -12.0 + linear_to_db(0.5)
-	add_child(input_hiss)
 	update_crt_static()
-
-func create_input_hiss() -> AudioStreamWAV:
-	const SAMPLE_RATE := 22050
-	var count := int(SAMPLE_RATE * INPUT_STATIC_SECONDS)
-	var data := PackedByteArray()
-	data.resize(count * 2)
-	var random := RandomNumberGenerator.new()
-	random.seed = 117
-	var filtered := 0.0
-	for index in range(count):
-		var progress := float(index) / count
-		filtered = lerpf(filtered, random.randf_range(-1.0, 1.0), 0.64)
-		var envelope := smoothstep(0.0, 0.02, progress) * (1.0 - smoothstep(0.22, 1.0, progress))
-		data.encode_s16(index * 2, roundi(filtered * envelope * 16000.0))
-	var stream := AudioStreamWAV.new()
-	stream.format = AudioStreamWAV.FORMAT_16_BITS
-	stream.mix_rate = SAMPLE_RATE
-	stream.data = data
-	return stream
 
 func update_crt_static() -> void:
 	var switching := not input_static_timer.is_stopped()
