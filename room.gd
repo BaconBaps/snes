@@ -1879,14 +1879,13 @@ func draw_graphite_cabinet() -> void:
 		line(Vector2(658, y), Vector2(700, y), "#60606f")
 		line(Vector2(658, y + 1), Vector2(700, y + 1), "#24232c", 2)
 	rounded(Rect2(655, 341, 48, 131), 4, "#2e2b39", "#4f485b")
-	for y in [348, 418, 434]:
-		rounded(Rect2(664, y, 28, 9), 4, "#171720", "#645c6e")
-		line(Vector2(669, y + 1), Vector2(686, y + 1), "#878093")
+	rounded(Rect2(664, 434, 28, 9), 4, "#171720", "#645c6e")
+	line(Vector2(669, 435), Vector2(686, 435), "#878093")
 	draw_circle(Vector2(695, 452), 2.5, Color("#9fd0bc") if powered else Color("#57444e"))
 	rounded(Rect2(147, 484, 547, 9), 3, "#211d29")
 
 func tv_input_rect(index: int) -> Rect2:
-	return Rect2(653, 361 + index * 23, 46, 18)
+	return Rect2(660, 351 + index * 40, 38, 16)
 
 func setup_tv_inputs() -> void:
 	for index in range(2):
@@ -1898,6 +1897,8 @@ func setup_tv_inputs() -> void:
 		button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		button.mouse_entered.connect(queue_redraw)
 		button.mouse_exited.connect(queue_redraw)
+		button.button_down.connect(queue_redraw)
+		button.button_up.connect(queue_redraw)
 		button.pressed.connect(request_console_switch.bind(index))
 		add_child(button)
 		tv_input_buttons.append(button)
@@ -1905,20 +1906,37 @@ func setup_tv_inputs() -> void:
 
 func position_tv_inputs() -> void:
 	for index in range(tv_input_buttons.size()):
-		var rect := tv_input_rect(index)
+		var rect := tv_input_rect(index).grow(3)
 		tv_input_buttons[index].position = rect.position + TV_OFFSET
 		tv_input_buttons[index].size = rect.size
 
 func draw_tv_inputs() -> void:
 	for index in range(tv_input_buttons.size()):
 		var rect := tv_input_rect(index)
+		var button := tv_input_buttons[index]
 		var active := index == int(megadrive)
-		var hovered_button := tv_input_buttons[index].is_hovered()
-		rounded(rect, 3, "#3b514d" if active else ("#51495b" if hovered_button else "#302936"),
-			"#86998b" if active else "#716275")
-		draw_string(ThemeDB.fallback_font, rect.position + Vector2(0, 12),
-			"SNES" if index == 0 else "MEGA DRIVE", HORIZONTAL_ALIGNMENT_CENTER,
-			int(rect.size.x), 7, Color("#dcf0d8" if active else "#dabfca"))
+		rounded(rect, 4, "#191820", "#655b6c")
+		var cap := rect.grow(-2.0)
+		if button.is_pressed():
+			cap.position.y += 1.0
+		rounded(cap, 3, "#504a5a" if button.is_hovered() else "#3d3947", "#292630")
+		line(cap.position + Vector2(4, 1), Vector2(cap.end.x - 4, cap.position.y + 1), "#777080")
+		line(Vector2(cap.position.x + 4, cap.end.y - 2), cap.end - Vector2(4, 2), "#24212d")
+		var indicator := Vector2(cap.end.x - 6, cap.get_center().y)
+		draw_circle(indicator, 2.5, Color("#28232c"), true, -1, true)
+		draw_circle(indicator, 1.5, Color("#c9d6a3" if active else "#554653"), true, -1, true)
+
+		var tape_width := 25.0 if index == 0 else 43.0
+		var tape_origin := Vector2(664 if index == 0 else 657, rect.end.y + 4)
+		var tilt := deg_to_rad(-6.0 if index == 0 else 4.0)
+		set_prop_transform(TV_OFFSET + tape_origin, tilt)
+		rounded(Rect2(0, 1, tape_width, 9), 1, "#1a1320")
+		rounded(Rect2(0, 0, tape_width, 9), 1, "#4e2b3b" if index == 0 else "#2b3548", "#7f6878")
+		var label := "SNES" if index == 0 else "MEGA DRIVE"
+		var font := ThemeDB.fallback_font
+		draw_string(font, Vector2(0.4, 7.7), label, HORIZONTAL_ALIGNMENT_CENTER, int(tape_width), 7, Color("#221722"))
+		draw_string(font, Vector2(0, 7), label, HORIZONTAL_ALIGNMENT_CENTER, int(tape_width), 7, Color("#f3d9d4"))
+		set_prop_transform(TV_OFFSET)
 
 func draw_television() -> void:
 	set_prop_transform(TV_OFFSET)
