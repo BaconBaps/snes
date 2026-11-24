@@ -89,12 +89,14 @@
   <path d="M136 95q51 17 100 0" fill="none" stroke="#f0deca" stroke-opacity=".76" stroke-width=".65"/>
 
   <!-- Recessed controls, volume track, and headphone jack. -->
-  <path d="M39 75h56q8 1 7 8l-5 43H32l-4-3 7-43q1-4 4-5Z" fill="#201d29" stroke="#655969" stroke-width=".65"/>
-  <path d="M40 77h53q7 0 6 5l-6 41H33l6-43Z" fill="url(#well)"/>
-  <path d="M39 83h12l-5 33H34Z" fill="#13111a" stroke="#545060" stroke-width=".55"/>
-  <path d="M34 85h-3m2 6h-3m2 6h-3m2 6h-3m2 6h-3" fill="none" stroke="#aa98a6" stroke-opacity=".65" stroke-width=".7"/>
-  <path d="M35 103q6-2 12 0l-2 9q-6 3-12 0Z" fill="url(#volume-cap)" stroke="#726273" stroke-width=".65"/>
-  <path d="M36 104h9" fill="none" stroke="#b67a79" stroke-width=".7"/>
+  <g transform="translate(-16 0)">
+    <path d="M39 75h56q8 1 7 8l-5 43H32l-4-3 7-43q1-4 4-5Z" fill="#201d29" stroke="#655969" stroke-width=".65"/>
+    <path d="M40 77h53q7 0 6 5l-6 41H33l6-43Z" fill="url(#well)"/>
+    <path d="M39 83h12l-5 33H34Z" fill="#13111a" stroke="#545060" stroke-width=".55"/>
+    <path d="M34 85h-3m2 6h-3m2 6h-3m2 6h-3m2 6h-3" fill="none" stroke="#aa98a6" stroke-opacity=".65" stroke-width=".7"/>
+    <path d="M35 103q6-2 12 0l-2 9q-6 3-12 0Z" fill="url(#volume-cap)" stroke="#726273" stroke-width=".65"/>
+    <path d="M36 104h9" fill="none" stroke="#b67a79" stroke-width=".7"/>
+  </g>
   <ellipse cx="56" cy="148" rx="4.2" ry="3.1" fill="#101018" stroke="#82717b" stroke-width=".75"/>
   <ellipse cx="56" cy="148" rx="2.25" ry="1.55" fill="#08080e"/>
   <path d="M53 147q3-2 6 0" fill="none" stroke="#c3a69c" stroke-opacity=".65" stroke-width=".65"/>

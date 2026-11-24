@@ -36,7 +36,8 @@ const TV_GLASS := Rect2(153, 96, 480, 360)
 const SCREEN := Rect2(TV_GLASS.position + TV_OFFSET, TV_GLASS.size)
 const MD_SHELL := preload("res://art/mega-drive-shell.svg")
 const MD_SLOT := Rect2(373.2, 480, 147.6, 14)
-const MD_RESET := Rect2(318, 550, 34, 12)
+const MD_RESET := Rect2(302, 550, 34, 12)
+const MD_POWER_LED := Vector2(447, 557)
 const MD_CART_WIDTH_SCALE := 0.9
 const MD_CART_SIZE := Vector2(160 * MD_CART_WIDTH_SCALE, 73)
 const MD_LABEL := Rect2(24, 11, 112, 55)
@@ -2010,37 +2011,39 @@ func draw_megadrive_console() -> void:
 		cartridge(inserted, console_position(), MD_SEATED_HEIGHT)
 		line(MD_SLOT.position + Vector2(5, 14), MD_SLOT.end - Vector2(5, 0), "#292531", 2)
 
-	var slider := Rect2(320, 524, 32, 12)
+	var slider := Rect2(304, 524, 32, 12)
 	rounded(slider.grow(1), 3, "#2b2433", "#6e6373")
 	rounded(slider, 2, "#14131d", "#16141f")
-	var switch_x := 324.0 if powered else 338.0
+	var switch_x := 308.0 if powered else 322.0
 	var toggle := Rect2(switch_x, 525, 10, 10)
 	rounded(toggle, 2, "#3e3545", "#635a69")
 	gradient(toggle.grow(-1.5), "#7a6e7d", "#252330")
 	line(toggle.position + Vector2(4, 1), toggle.position + Vector2(4, 8), "#bc6867")
-	words("ON", 321, 541, 4)
-	words("OFF", 343, 541, 4)
-	words("POWER", 323, 547, 6)
-	words("VOL", 294, 569, 5)
+	words("ON", 305, 541, 4)
+	words("OFF", 327, 541, 4)
+	words("POWER", 307, 547, 6)
+	words("VOL", 278, 569, 5)
 	rounded(MD_RESET.grow(1), 3, "#201c29", "#726774")
 	var reset_cap := MD_RESET.grow(-1.5)
 	rounded(reset_cap, 2, "#fff0dc" if MD_RESET.has_point(pointer) and seated else "#c6bdb6")
 	gradient(reset_cap.grow(-1.0), "#fff4e5" if MD_RESET.has_point(pointer) and seated else "#f3e6d5", "#b0a29d")
-	for x in range(324, 348, 4):
+	for x in range(308, 332, 4):
 		for y in [554.0, 557.0]:
 			draw_circle(Vector2(x, y), 0.6, Color("#81747c"), true, -1, true)
-	words("RESET", 324, 571, 6)
+	words("RESET", 308, 571, 6)
 
 	var font := ThemeDB.fallback_font
 	var badge_position := Vector2(413, 535)
 	draw_string(font, badge_position + Vector2(0, 1), "16-BIT", HORIZONTAL_ALIGNMENT_CENTER, 68, 17, Color("#715741"))
 	draw_string(font, badge_position, "16-BIT", HORIZONTAL_ALIGNMENT_CENTER, 68, 17, Color("#f0d292"))
-	draw_string(font, Vector2(425, 551), "POWER", HORIZONTAL_ALIGNMENT_LEFT, -1, 4, Color("#524451"))
-	draw_string(font, Vector2(457, 551), "ON", HORIZONTAL_ALIGNMENT_LEFT, -1, 4, Color("#524451"))
-	draw_circle(Vector2(447, 550), 3.25, Color("#66565c"), true, -1, true)
-	draw_circle(Vector2(447, 550), 2.45, Color("#30232e"), true, -1, true)
-	draw_string(font, Vector2(474, 575), "MEGA DRIVE", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color("#d5c5d4"))
-	draw_string(font, Vector2(531, 575), "SEGA", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color("#e6d7e2"))
+	draw_string(font, Vector2(425, 558), "POWER", HORIZONTAL_ALIGNMENT_LEFT, -1, 4, Color("#524451"))
+	draw_string(font, Vector2(457, 558), "ON", HORIZONTAL_ALIGNMENT_LEFT, -1, 4, Color("#524451"))
+	draw_circle(MD_POWER_LED, 3.25, Color("#66565c"), true, -1, true)
+	draw_circle(MD_POWER_LED, 2.45, Color("#30232e"), true, -1, true)
+	set_prop_transform(Vector2(500, 575), 0.0, Vector2(0.75, 0.75))
+	draw_string(font, Vector2.ZERO, "MEGA DRIVE", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color("#d5c5d4"))
+	draw_string(font, Vector2(57, 0), "SEGA", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color("#e6d7e2"))
+	set_prop_transform(Vector2.ZERO)
 	for port in [MD_PORT_ONE, MD_PORT_TWO]:
 		rounded(port.grow(1), 3, "#181620", "#635767")
 		shape([port.position + Vector2(2, 1), port.position + Vector2(31, 1),
@@ -2172,7 +2175,7 @@ func draw_room_overlay() -> void:
 	if not powered:
 		return
 	if megadrive:
-		var led := Vector2(447, 550) + left_slide
+		var led := MD_POWER_LED + left_slide
 		glow(led, Vector2(13, 9), Color("#fb435475"), room_overlay)
 		room_overlay.draw_circle(led, 2.3, Color("#fc4258"), true, -1, true)
 	else:
