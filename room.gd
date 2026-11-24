@@ -84,7 +84,7 @@ const TRIGGER_RELEASE := 0.35
 const STACK_LIFT := -22.0
 const LABEL_COLORS := ["#367d80", "#a05261", "#646095", "#8b693c"]
 
-var poster_picker := FileDialog.new()
+var poster_picker := preload("res://poster_picker.gd").new()
 var poster_images: Array[Texture2D] = []
 var editing_poster := -1
 var manual := preload("res://manuals/manual_viewer.gd").new()
@@ -1588,10 +1588,6 @@ func draw_megadrive_cartridge(index: int, at: Vector2, height: float) -> void:
 	set_prop_transform(Vector2.ZERO)
 
 func setup_posters() -> void:
-	poster_picker.access = FileDialog.ACCESS_FILESYSTEM
-	poster_picker.file_mode = FileDialog.FILE_MODE_OPEN_FILE
-	poster_picker.title = "Choose poster artwork"
-	poster_picker.filters = PackedStringArray(["*.png, *.jpg, *.jpeg, *.webp ; Images"])
 	poster_picker.file_selected.connect(import_poster)
 	poster_picker.add_button("Restore original", true, "restore")
 	poster_picker.custom_action.connect(func(_action: String): restore_poster())
@@ -1616,7 +1612,7 @@ func setup_posters() -> void:
 		hotspot.rotation = deg_to_rad(POSTER_TILTS[index])
 		hotspot.pressed.connect(func():
 			editing_poster = index
-			poster_picker.popup_centered_ratio(0.72))
+			poster_picker.open_for_poster())
 		add_child(hotspot)
 
 func poster_path(index: int) -> String:

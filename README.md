@@ -72,7 +72,7 @@ The app matches the games in the selected ROM folder using filenames and checksu
 
 ## Room and emulation settings
 
-Click any wall poster to choose a PNG, JPG, JPEG, or WebP image. It stretches to fill that poster and is saved for future launches. Choose **Restore original** in the same dialog to bring back its original artwork.
+Click any wall poster to browse PNG, JPG, JPEG, or WebP images in a thumbnail grid. It stretches to fill that poster and is saved for future launches. Choose **Restore original** in the same dialog to bring back its original artwork.
 
 Click the hanging light to dim the bedroom. The CRT image and its glow keep their brightness. The room uses the Graphite cabinet with the Soft CRT effect.
 
