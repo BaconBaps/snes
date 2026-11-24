@@ -99,7 +99,7 @@ signal console_changed
 var tv_input_buttons: Array[Button] = []
 var library_navigation := HBoxContainer.new()
 var console_transition: Tween
-var left_slide := Vector2.ZERO
+var console_slide := Vector2.ZERO
 var right_slide := Vector2.ZERO
 var prop_draw_offset := Vector2.ZERO
 var notebook_button := Button.new()
@@ -438,7 +438,8 @@ func request_console_switch(index: int) -> void:
 		emulator.set_paused(false))
 
 func update_console_slide(progress: float) -> void:
-	left_slide = Vector2(-760.0 * progress, 0)
+	# Clear even an ejected cartridge that reaches the bottom of the CRT.
+	console_slide = Vector2(0, (get_viewport_rect().end.y - SCREEN.end.y + 8.0) * progress)
 	right_slide = Vector2(maxf(420.0, get_viewport_rect().end.x - 738.0) * progress, 0)
 	notebook_button.position = notebook_position() + right_slide
 	manual_button.position = manual_position() + right_slide
@@ -2136,7 +2137,7 @@ func _draw() -> void:
 	set_prop_transform(Vector2.ZERO)
 	draw_tv_stand()
 	draw_television()
-	prop_draw_offset = left_slide
+	prop_draw_offset = console_slide
 	set_prop_transform(Vector2.ZERO)
 	draw_console()
 	draw_controller_plugs()
@@ -2171,11 +2172,11 @@ func draw_room_overlay() -> void:
 	if not powered:
 		return
 	if megadrive:
-		var led := MD_POWER_LED + left_slide
+		var led := MD_POWER_LED + console_slide
 		glow(led, Vector2(13, 9), Color("#fb435475"), room_overlay)
 		room_overlay.draw_circle(led, 2.3, Color("#fc4258"), true, -1, true)
 	else:
-		room_overlay.draw_set_transform_matrix(CONSOLE_TRANSFORM.translated(left_slide))
+		room_overlay.draw_set_transform_matrix(CONSOLE_TRANSFORM.translated(console_slide))
 		glow(Vector2(499, 579), Vector2(20, 8), Color("#ff4d5568"), room_overlay)
 		rounded(Rect2(492, 577.8, 14, 3), 2, "#ff3d5c", "", room_overlay)
 		room_overlay.draw_line(Vector2(495, 578.3), Vector2(503, 578.3), Color("#ffacaf"), 1.0, true)
