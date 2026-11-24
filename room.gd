@@ -1379,7 +1379,7 @@ func slot_flap_opening() -> float:
 		var slot := MD_SLOT if megadrive else SLOT
 		var at := insertion_position if insertion_animation else cartridge_slot_pose(pointer)
 		return smoothstep(slot.position.y + 1.0, slot.end.y + 5.0, at.y + cartridge_size().y)
-	return 1.0 if inserted >= 0 and dragging != inserted else 0.0
+	return 1.0 if inserted >= 0 and (seated or dragging != inserted) else 0.0
 
 func draw_slot_cartridge() -> void:
 	var slot := MD_SLOT if megadrive else SLOT
@@ -1387,7 +1387,7 @@ func draw_slot_cartridge() -> void:
 		var at := insertion_position if insertion_animation else cartridge_slot_pose(pointer)
 		var index := inserted if insertion_animation else dragging
 		cartridge(index, at, minf(cartridge_size().y, slot.end.y - at.y))
-	elif inserted >= 0 and inserted != dragging:
+	elif inserted >= 0 and (seated or inserted != dragging):
 		cartridge(inserted, console_position(), console_cartridge_height())
 
 func finish_insertion() -> void:
@@ -2041,17 +2041,19 @@ func draw_snes_slot_lip() -> void:
 func draw_snes_flap(opening: float) -> void:
 	var flap := SLOT_ART.grow(-2.0)
 	var compression := lerpf(1.0, 0.19, opening)
+	var shade := 0.75 * opening
 	var flap_matrix := CONSOLE_TRANSFORM * Transform2D(0.0, Vector2(1.0, compression), 0.0, flap.position)
 	set_prop_matrix(flap_matrix)
-	rounded(Rect2(Vector2.ZERO, flap.size), 4, "#666373", "#a5a0aa")
+	rounded(Rect2(Vector2.ZERO, flap.size), 4,
+		Color("#666373").darkened(shade).to_html(false), Color("#a5a0aa").darkened(shade).to_html(false))
 	for x in [8.0, flap.size.x - 8.0]:
-		line(Vector2(x, 1.5), Vector2(x, flap.size.y - 1.5), "#494653")
+		line(Vector2(x, 1.5), Vector2(x, flap.size.y - 1.5), Color("#494653").darkened(shade).to_html(false))
 	set_prop_matrix(flap_matrix * Transform2D(0.0, Vector2(1.0, 0.51), 0.0, Vector2(0, 6.4)))
 	draw_string(ThemeDB.fallback_font, Vector2.ZERO, "P A L   V E R S I O N",
-		HORIZONTAL_ALIGNMENT_CENTER, int(flap.size.x), 6, Color("#e4dce2"))
+		HORIZONTAL_ALIGNMENT_CENTER, int(flap.size.x), 6, Color("#e4dce2").darkened(shade))
 	set_prop_matrix(flap_matrix)
 	var arrow := Vector2(flap.size.x * 0.5, flap.size.y - 3)
-	shape([arrow + Vector2(-3, 0), arrow + Vector2(3, 0), arrow + Vector2(0, 1.6)], "#a7a0ad")
+	shape([arrow + Vector2(-3, 0), arrow + Vector2(3, 0), arrow + Vector2(0, 1.6)], Color("#a7a0ad").darkened(shade).to_html(false))
 	set_prop_matrix(CONSOLE_TRANSFORM)
 
 func draw_megadrive_console() -> void:
@@ -2119,7 +2121,8 @@ func draw_megadrive_flaps(opening: float, front: bool) -> void:
 	var span := lerpf(MD_SLOT.size.y * 0.5 - 1.0, 1.4, opening)
 	var flap := Rect2(x, hinge_y - span if front else hinge_y, MD_SLOT.size.x - 14.0, span)
 	rounded(flap, 2, "#252331" if front else "#33303e", "#191822")
-	line(flap.position + Vector2(5, 0.5), Vector2(flap.end.x - 5, flap.position.y + 0.5), "#626071")
+	if front:
+		line(flap.position + Vector2(5, 0.5), Vector2(flap.end.x - 5, flap.position.y + 0.5), "#626071")
 
 func draw_console_wordmark() -> void:
 	var font := ThemeDB.fallback_font
