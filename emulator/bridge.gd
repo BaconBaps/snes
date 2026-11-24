@@ -41,6 +41,7 @@ var sent_mask := -1
 var sent_second_mask := -1
 var player_two_connected := false
 var mouse_enabled := false
+var keyboard_enabled := true
 var mouse_motion := Vector2.ZERO
 var audio := AudioStreamPlayer.new()
 var playback: AudioStreamGeneratorPlayback
@@ -364,7 +365,7 @@ func send_inputs() -> void:
 	if mouse_enabled:
 		send_mouse_motion()
 	else:
-		var first := read_input(devices[0] if not devices.is_empty() else -1, true) if focused else 0
+		var first := read_input(devices[0] if not devices.is_empty() else -1, keyboard_enabled) if focused else 0
 		if first != sent_mask:
 			send_command(73, first)
 			sent_mask = first

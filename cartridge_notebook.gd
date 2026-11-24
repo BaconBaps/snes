@@ -28,7 +28,7 @@ func setup(owner_room: Node2D) -> void:
 	content.add_theme_constant_override("separation", 8)
 	add_child(content)
 	content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 17)
-	room.add_settings_heading(content, "Cartridge notebook")
+	room.add_settings_heading(content, "Cart List")
 
 	search.placeholder_text = "Find a cartridge…"
 	search.text_changed.connect(func(_value: String): refresh())

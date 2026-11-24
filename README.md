@@ -34,11 +34,15 @@ The output is `dist/Bedroom-Gaming-Emulator-Windows.zip`. The builder packages a
 
 Recipients extract the ZIP and open **Bedroom Gaming Emulator.exe**. Keep the adjacent folders with the executable. They do not need Godot, Python, pip, or a separate PDF viewer.
 
-## Cartridge notebook and shoeboxes
+## Cart List and shoeboxes
 
-Click the **Game notes** pad tucked behind the cartridges to search by name or filter for favourites, recently played games, and the active shoebox. Choose a result and click **Find in shoebox** to jump to and highlight its cartridge.
+Click the **Cart List** pad tucked behind the cartridges to search by name or filter for favourites, recently played games, and the active shoebox. Choose a result and click **Find in shoebox** to jump to and highlight its cartridge.
 
 To make a custom shoebox, enter a name and click **Create box**. Select a game in the notebook and choose **Add to box**. Use **Move earlier** or **Move later**, or drag a cartridge onto another cartridge in the shoebox to change its place. The notebook remembers favourites, recent games, custom boxes, and their order across launches. Select **All cartridges** to return to the complete ROM library.
+
+## Game Notes
+
+Insert a cartridge and click the **Game Notes** booklet beside the Cart List. The editor opens on the right and saves your text automatically beside the ROM. For example, `Sonic (USA).md` uses `Sonic (USA).txt`.
 
 ## Mega Drive
 

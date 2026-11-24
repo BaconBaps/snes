@@ -102,6 +102,8 @@ var left_slide := Vector2.ZERO
 var right_slide := Vector2.ZERO
 var prop_draw_offset := Vector2.ZERO
 var notebook_button := Button.new()
+var notes_button := Button.new()
+var game_notes := preload("res://game_notes.gd").new()
 var notebook := preload("res://cartridge_notebook.gd").new()
 var shoebox_indices: Array[int] = []
 var notebook_selection := -1
@@ -259,16 +261,22 @@ func _ready() -> void:
 	notebook_button.name = "NotebookButton"
 	notebook_button.flat = true
 	notebook_button.focus_mode = Control.FOCUS_NONE
-	notebook_button.tooltip_text = "Open cartridge notebook"
+	notebook_button.tooltip_text = "Open Cart List"
 	notebook_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	notebook_button.position = notebook_position()
 	notebook_button.rotation = deg_to_rad(-9)
 	notebook_button.size = Vector2(99, 48)
 	notebook_button.mouse_entered.connect(queue_redraw)
 	notebook_button.mouse_exited.connect(queue_redraw)
-	notebook_button.pressed.connect(notebook.open_notebook)
+	notebook_button.pressed.connect(func():
+		game_notes.close_for_room()
+		notebook.open_notebook())
 	add_child(notebook_button)
 	setup_manual()
+	setup_game_notes()
+	for bridge in console_emulators:
+		game_notes.editor.focus_entered.connect(func(): bridge.keyboard_enabled = false)
+		game_notes.editor.focus_exited.connect(func(): bridge.keyboard_enabled = true)
 	get_viewport().size_changed.connect(queue_redraw)
 	get_window().mouse_exited.connect(func(): hovered = -1)
 	get_window().focus_exited.connect(release_game_mouse)
@@ -289,6 +297,7 @@ func _ready() -> void:
 		first_run.open.call_deferred()
 
 func _exit_tree() -> void:
+	game_notes.flush()
 	release_game_mouse()
 	insert_sound.stop()
 	eject_sound.stop()
@@ -372,6 +381,7 @@ func switch_console(index: int) -> void:
 		"inserted": inserted, "seated": seated, "powered": powered, "lift": lift,
 		"page": page, "message": message, "preview_elapsed": Time.get_ticks_msec() - preview_started,
 	}
+	game_notes.close_for_room()
 	manual.set_rom("")
 	inserted = -1
 	dragging = -1
@@ -413,6 +423,7 @@ func request_console_switch(index: int) -> void:
 	dragging_plug = false
 	clear_stack_hover()
 	manual.hide()
+	game_notes.close_for_room()
 	console_transition = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	console_transition.tween_method(update_console_slide, 0.0, 1.0, 0.36)
 	console_transition.tween_callback(func():
@@ -430,6 +441,7 @@ func update_console_slide(progress: float) -> void:
 	right_slide = Vector2(maxf(420.0, get_viewport_rect().end.x - 738.0) * progress, 0)
 	notebook_button.position = notebook_position() + right_slide
 	manual_button.position = manual_position() + right_slide
+	notes_button.position = notes_position() + right_slide
 	library_navigation.position = Vector2(783, 563) + right_slide
 	queue_redraw()
 
@@ -453,6 +465,7 @@ func finish_setup(folders: Array[PackedStringArray], apply_folders: bool) -> voi
 			inserted = -1
 			seated = false
 			powered = false
+			game_notes.close_for_room()
 			manual.set_rom("")
 			load_console_library()
 		else:
@@ -835,6 +848,7 @@ func load_folder(path: String, keep_session := false) -> void:
 		save_preferences()
 	if not keep_session:
 		emulator.stop()
+	game_notes.close_for_room()
 	manual.set_rom("")
 	titles.clear()
 	rom_paths.clear()
@@ -982,6 +996,7 @@ func change_layout(index: int) -> void:
 	stacked = index == 1
 	notebook_button.position = notebook_position()
 	manual_button.position = manual_position()
+	notes_button.position = notes_position()
 	save_preferences()
 	page = floori(first_visible / float(page_size()))
 	update_page_controls()
@@ -1285,6 +1300,7 @@ func press_at(point: Vector2) -> void:
 	elif not megadrive and EJECT.has_point(point) and seated:
 		last_eject = play_cartridge_sound(eject_sound, EJECT_SOUNDS, last_eject)
 		emulator.stop()
+		game_notes.close_for_room()
 		manual.set_rom("")
 		powered = false
 		seated = false
@@ -1342,6 +1358,7 @@ func pull_cartridge_if_moved(point: Vector2) -> void:
 	inserted = -1
 	seated = false
 	powered = false
+	game_notes.close_for_room()
 	manual.set_rom("")
 	message = "Cartridge removed. Drop it back in the slot to play again."
 
@@ -1721,13 +1738,49 @@ func draw_notebook() -> void:
 	for x in range(9, 96, 9):
 		draw_circle(Vector2(x, 5), 1.6, Color("#584653"), true, -1, true)
 		draw_arc(Vector2(x, 2), 3.0, PI * 0.2, PI * 1.8, 12, Color("#795d59"), 1.4, true)
-	draw_string(ThemeDB.fallback_font, Vector2(22, 21), "Game notes",
+	draw_string(ThemeDB.fallback_font, Vector2(22, 21), "Cart List",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#55415e"))
 	var notes := PackedVector2Array([Vector2(23, 29), Vector2(32, 28), Vector2(37, 30),
 		Vector2(47, 28), Vector2(55, 29), Vector2(70, 27)])
 	draw_polyline(notes, Color("#675173aa"), 1.1, true)
 	line(Vector2(23, 38), Vector2(76, 36), "#67517379")
 	line(Vector2(23, 45), Vector2(64, 44), "#67517369")
+	set_prop_transform(Vector2.ZERO)
+
+func notes_position() -> Vector2:
+	return Vector2(882, 251 if stacked else 203)
+
+func setup_game_notes() -> void:
+	notes_button.name = "GameNotesBook"
+	notes_button.flat = true
+	notes_button.focus_mode = Control.FOCUS_NONE
+	notes_button.tooltip_text = "Open Game Notes for the inserted cartridge"
+	notes_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	notes_button.position = notes_position()
+	notes_button.rotation = deg_to_rad(-3)
+	notes_button.size = Vector2(74, 46)
+	notes_button.mouse_entered.connect(queue_redraw)
+	notes_button.mouse_exited.connect(queue_redraw)
+	notes_button.pressed.connect(func():
+		if not seated or inserted < 0 or inserted >= rom_paths.size():
+			message = "Insert a game to open its notes."
+			queue_redraw()
+			return
+		manual.hide()
+		game_notes.open_rom(rom_paths[inserted]))
+	add_child(notes_button)
+	add_child(game_notes)
+	game_notes.setup(self)
+
+func draw_game_notes_book() -> void:
+	set_prop_transform(notes_position(), notes_button.rotation)
+	rounded(Rect2(3, 5, 74, 88), 4, "#21172490")
+	rounded(Rect2(1, 3, 72, 88), 3, "#d4b493", "#946f69")
+	rounded(Rect2(0, 0, 70, 85), 4, "#60505f" if notes_button.is_hovered() else "#524454", "#a48283")
+	rounded(Rect2(0, 1, 9, 83), 3, "#392b40")
+	rounded(Rect2(14, 12, 49, 24), 3, "#dfc5a7", "#9a7977")
+	draw_string(ThemeDB.fallback_font, Vector2(14, 27), "Game Notes",
+		HORIZONTAL_ALIGNMENT_CENTER, 49, 8, Color("#49394a"))
 	set_prop_transform(Vector2.ZERO)
 
 func setup_manual() -> void:
@@ -1739,7 +1792,9 @@ func setup_manual() -> void:
 	manual_button.position = manual_position()
 	manual_button.rotation = deg_to_rad(7)
 	manual_button.size = Vector2(84, 45)
-	manual_button.pressed.connect(manual.open_manual)
+	manual_button.pressed.connect(func():
+		game_notes.close_for_room()
+		manual.open_manual())
 	manual_button.mouse_entered.connect(queue_redraw)
 	manual_button.mouse_exited.connect(queue_redraw)
 	manual_button.hide()
@@ -2037,6 +2092,7 @@ func _draw() -> void:
 	set_prop_transform(Vector2.ZERO)
 	draw_shoebox()
 	draw_notebook()
+	draw_game_notes_book()
 	draw_manual()
 	prop_draw_offset = Vector2.ZERO
 	set_prop_transform(Vector2.ZERO)
