@@ -34,6 +34,8 @@ Restore replaces the app’s saved data and asks you to reopen it. Keep the ROM 
 
 ## Build a portable Windows ZIP
 
+The portable build starts with empty ROM, artwork, and manual folder settings and uses its own Windows profile, separate from the Godot editor project. It remembers choices after the first run.
+
 Install the export templates matching your Godot 4 editor (**Editor → Manage Export Templates**). From the project folder, run this build command with a Python installation that has pip:
 
 ```powershell
