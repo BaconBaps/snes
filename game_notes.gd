@@ -60,7 +60,7 @@ func setup(room: Node2D) -> void:
 	hide()
 
 func open_rom(rom: String) -> void:
-	var destination := rom.get_basename() + ".txt"
+	var destination := preload("res://local_runtime.gd").notes_path(rom)
 	if visible and note_path == destination:
 		editor.grab_focus()
 		return
@@ -68,7 +68,7 @@ func open_rom(rom: String) -> void:
 	note_path = destination
 	heading.text = rom.get_file().get_basename()
 	heading.tooltip_text = note_path
-	status.text = "Saves beside the ROM"
+	status.text = "Saves to restored notes" if FileAccess.file_exists(destination) and destination != rom.get_basename() + ".txt" else "Saves beside the ROM"
 	editor.editable = true
 	var body := ""
 	if drafts.has(note_path):
@@ -101,16 +101,16 @@ func flush() -> bool:
 	var temporary := "%s.%d.%d.tmp" % [note_path, OS.get_process_id(), Time.get_ticks_usec()]
 	var file := FileAccess.open(temporary, FileAccess.WRITE)
 	if file == null:
-		status.text = "Could not save beside the ROM."
+		status.text = "Could not save the notes."
 		return false
 	file.store_string(drafts[note_path])
 	var error := file.get_error()
 	file.close()
 	if error != OK or DirAccess.rename_absolute(temporary, note_path) != OK:
 		DirAccess.remove_absolute(temporary)
-		status.text = "Could not save beside the ROM."
+		status.text = "Could not save the notes."
 		return false
 	saved_text = drafts[note_path]
 	drafts.erase(note_path)
-	status.text = "Saved beside the ROM"
+	status.text = "Notes saved"
 	return true

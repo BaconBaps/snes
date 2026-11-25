@@ -18,13 +18,19 @@ The ROM folder and preferences are saved in Godot’s per-user data folder. They
 
 ## ZIP cartridges
 
-Both consoles accept `.zip` cartridges containing exactly one ROM for that console. An archive can include other files such as a readme, but its ROM must use a supported extension. Match the artwork and manual to the archive name, for example `My Game.zip`, `My Game.png` and `My Game.pdf`. Saves and notes are tied to the archive path. ZIPs must be unencrypted and the ROM inside must be at most 32 MiB. Use loose ROM files for ScreenScraper lookups.
+Both consoles accept `.zip` cartridges containing exactly one ROM for that console. An archive can include other files such as a readme, but its ROM must use a supported extension. Match the artwork and manual to the archive name, for example `My Game.zip`, `My Game.png` and `My Game.pdf`. Saves and notes are tied to the archive path. ZIPs must be unencrypted and the ROM inside must be at most 32 MiB.
 
 ## First-time setup
 
 The wizard opens automatically on a fresh profile. It covers controls and lets you choose separate ROM, cartridge art and PDF manual folders for each console. You can skip any folder or skip setup entirely. Open **Settings → Setup wizard** to return later. Existing profiles can open the wizard from Settings.
 
 Keep the same filename stem for matching files, including any region tags. For example, `Sonic (USA).md`, `Sonic (USA).png` and `Sonic (USA).pdf` match.
+
+## Backup and restore
+
+Use **Settings → Backup and restore** to save a ZIP with preferences, ROM folder locations and a ROM inventory, Cart List collections, save states, battery saves, notes, posters, and matching labels and PDFs. Eject running cartridges first to save their latest battery progress. The backup uses the Python runtime already required for gaming.
+
+Restore replaces the app’s saved data and asks you to reopen it. Keep the ROM files separately at the same paths to preserve their associations with saves, notes and Cart List entries. Restored artwork and manuals are available when the originals are missing. Restored notes are edited in the app’s data directory.
 
 ## Build a portable Windows ZIP
 
@@ -52,7 +58,7 @@ Insert a cartridge and click the **Game Notes** booklet beside the Cart List. Th
 
 Extract the [Windows x64 Genesis Plus GX core](https://buildbot.libretro.com/nightly/windows/x86_64/latest/genesis_plus_gx_libretro.dll.zip) into `emulator` beside `host.py`. On Linux x86-64, use the [Linux core](https://buildbot.libretro.com/nightly/linux/x86_64/latest/genesis_plus_gx_libretro.so.zip).
 
-Press **MEGA DRIVE** on the TV or choose it in Settings, then choose a ROM folder containing `.md`, `.gen`, `.bin`, or `.smd` cartridges. The Mega Drive remembers its own ROM and artwork folders. Use the **SNES** and **MEGA DRIVE** buttons on the TV to switch inputs. Switching pauses the outgoing game and resumes the incoming game when its console finishes sliding in. Both cartridges stay where you left them until you close the app. Drag a cartridge into the slot to boot it, click the white **Reset** button to restart, and pull the cartridge free to power off. With no Mega Drive ROM folder selected, Tank Battle is available in the shoebox.
+Press **MEGA DRIVE** on the TV, then use **Settings → Choose ROM folder** to select a Mega Drive folder containing `.md`, `.gen`, `.bin`, or `.smd` cartridges. The Mega Drive remembers its own ROM and artwork folders. Use the **SNES** and **MEGA DRIVE** buttons on the TV to switch inputs. Switching pauses the outgoing game and resumes the incoming game when its console finishes sliding in. Both cartridges stay where you left them until you close the app. Drag a cartridge into the slot to boot it, click the white **Reset** button to restart, and pull the cartridge free to power off. With no Mega Drive ROM folder selected, Tank Battle is available in the shoebox.
 
 The core uses six-button controllers. On a gamepad, the west, south, and east face buttons map to A, B, and C. L1, north, and R1 map to X, Y, and Z. On the keyboard, **A**, **Z**, **X** map to A, B, C, and **Q**, **S**, **W** map to X, Y, Z. Enter is Start and Shift is Mode. Connect the second plug to enable Player 2.
 
@@ -68,11 +74,9 @@ Put a cropped label image next to its ROM or choose a separate directory under *
 
 Artwork stretches to fill the rounded label area. Crop it to roughly 3.7:1 beforehand if you want to preserve its original proportions.
 
-## ScreenScraper downloads
+## Existing downloaded media
 
-Open **Settings → Download art and manuals**, enter your [ScreenScraper](https://www.screenscraper.fr/) account credentials and your developer API credentials, then choose **Download missing media**. ScreenScraper requires a developer ID and password for API access. See the [ScreenScraper API documentation](https://www.screenscraper.fr/webapi2.php) for details. The app keeps credentials only for the current session.
-
-The app matches the games in the selected ROM folder using filenames and checksums. It downloads available cartridge artwork and PDF manuals into the app's data folder. Local artwork and manuals take priority. Downloads already saved are reused on future launches. If ScreenScraper pauses the run because of your account quota, you can run it again once the quota resets.
+Previously downloaded artwork and manuals remain available in the app. Local matching artwork and PDFs take priority.
 
 ## Room and emulation settings
 

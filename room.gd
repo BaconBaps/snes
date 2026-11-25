@@ -565,136 +565,76 @@ func add_settings_heading(menu: VBoxContainer, title: String) -> void:
 	menu.add_child(divider)
 
 func setup_settings() -> void:
-	var picker := FileDialog.new()
-	picker.access = FileDialog.ACCESS_FILESYSTEM
-	picker.file_mode = FileDialog.FILE_MODE_OPEN_DIR
-	picker.dir_selected.connect(func(path: String):
-		if picker.title == "Choose cartridge art folder":
-			load_art_folder(path)
-		else:
-			load_folder(path))
-	add_child(picker)
-
 	var settings := PopupPanel.new()
 	settings.name = "Settings"
 	settings.theme = make_settings_theme()
 	add_child(settings)
 	var menu := VBoxContainer.new()
-	menu.add_theme_constant_override("separation", 9)
+	menu.add_theme_constant_override("separation", 10)
 	settings.add_child(menu)
 	menu.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 17)
-
 	add_settings_heading(menu, "Settings")
-	var console_picker := OptionButton.new()
-	console_picker.name = "ConsolePicker"
-	console_picker.add_item("Super Nintendo")
-	console_picker.add_item("Mega Drive")
-	console_picker.select(int(megadrive))
-	menu.add_child(console_picker)
 
-	var folder_button := Button.new()
-	folder_button.text = "Choose ROM folder"
-	folder_button.pressed.connect(func():
-		settings.hide()
-		picker.title = "Choose ROM folder"
-		if DirAccess.dir_exists_absolute(rom_folder):
-			picker.current_dir = rom_folder
-		picker.popup_centered_ratio(0.8))
-	menu.add_child(folder_button)
+	var columns := HBoxContainer.new()
+	columns.add_theme_constant_override("separation", 20)
+	menu.add_child(columns)
+	var metadata := VBoxContainer.new()
+	var emulation := VBoxContainer.new()
+	for column in [metadata, emulation]:
+		column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		column.add_theme_constant_override("separation", 8)
+		columns.add_child(column)
 
-	var emulation_page := VBoxContainer.new()
-	emulation_page.add_theme_constant_override("separation", 9)
-	settings.add_child(emulation_page)
-	emulation_page.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 17)
-	emulation_page.hide()
-
-	var emulation_button := Button.new()
-	emulation_button.text = "Emulation  ›"
-	emulation_button.pressed.connect(func():
-		menu.hide()
-		refresh_port_one_picker()
-		emulation_page.show()
-		settings.popup_centered(Vector2i(344, 520)))
-	menu.add_child(emulation_button)
-
-	var back := Button.new()
-	back.text = "‹  Back to settings"
-	back.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	back.pressed.connect(func():
-		emulation_page.hide()
-		menu.show()
-		settings.popup_centered(Vector2i(344, 406)))
-	emulation_page.add_child(back)
-	add_settings_heading(emulation_page, "Emulation")
-
-	var core_label := Label.new()
-	core_label.text = "SNES core"
-	emulation_page.add_child(core_label)
-	core_picker.tooltip_text = "Emulation core for the next cartridge"
-	for name in emulator.CORE_NAMES:
-		core_picker.add_item(name)
-	core_picker.select(preferred_core)
-	core_picker.item_selected.connect(func(index: int):
-		preferred_core = index
-		save_preferences())
-	emulation_page.add_child(core_picker)
-	add_emulation_controls(emulation_page)
+	add_settings_heading(metadata, "Metadata")
+	var entries := {"Choose ROM folder": 2, "Choose cartridge art folder": 3, "Setup wizard": 0}
+	for caption: String in entries:
+		var button := Button.new()
+		button.text = caption + "  ›"
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		var wizard_page: int = entries[caption]
+		button.pressed.connect(func():
+			settings.hide()
+			first_run.open(wizard_page))
+		metadata.add_child(button)
 
 	var layout_label := Label.new()
 	layout_label.text = "Cartridge view"
-	menu.add_child(layout_label)
+	metadata.add_child(layout_label)
 	var layout_picker := OptionButton.new()
 	layout_picker.add_item("Grid")
 	layout_picker.add_item("Stack")
 	layout_picker.select(1 if stacked else 0)
 	layout_picker.item_selected.connect(change_layout)
-	menu.add_child(layout_picker)
+	metadata.add_child(layout_picker)
 
-	var art_button := Button.new()
-	art_button.text = "Choose cartridge art folder"
-	art_button.pressed.connect(func():
-		settings.hide()
-		picker.title = "Choose cartridge art folder"
-		var start_dir := art_folder if DirAccess.dir_exists_absolute(art_folder) else rom_folder
-		if DirAccess.dir_exists_absolute(start_dir):
-			picker.current_dir = start_dir
-		picker.popup_centered_ratio(0.8))
-	menu.add_child(art_button)
-	menu.move_child(art_button, folder_button.get_index() + 1)
-	var scraper := preload("res://screenscraper/scraper_dialog.gd").new()
-	add_child(scraper)
-	scraper.setup(self)
-	var scrape_button := Button.new()
-	scrape_button.text = "Download art and manuals  ›"
-	scrape_button.pressed.connect(func():
-		settings.hide()
-		scraper.open())
-	menu.add_child(scrape_button)
-	scrape_button.disabled = megadrive
-	scrape_button.tooltip_text = "ScreenScraper downloads are available for SNES."
-	core_picker.visible = not megadrive
+	add_settings_heading(emulation, "Emulation")
+	var core_label := Label.new()
 	core_label.text = emulator.MEGA_DRIVE_CORE_NAME if megadrive else "SNES core"
-	console_picker.item_selected.connect(func(index: int):
-		console_picker.select(int(megadrive))
-		settings.hide()
-		request_console_switch(index))
+	emulation.add_child(core_label)
+	core_picker.tooltip_text = "Emulation core for the next SNES cartridge"
+	for name in emulator.CORE_NAMES:
+		core_picker.add_item(name)
+	core_picker.select(preferred_core)
+	core_picker.visible = not megadrive
+	core_picker.item_selected.connect(func(index: int):
+		preferred_core = index
+		save_preferences())
+	emulation.add_child(core_picker)
 	console_changed.connect(func():
-		console_picker.select(int(megadrive))
-		scrape_button.disabled = megadrive
 		core_picker.visible = not megadrive
 		core_label.text = emulator.MEGA_DRIVE_CORE_NAME if megadrive else "SNES core")
-	menu.move_child(scrape_button, art_button.get_index() + 1)
-	for button in [folder_button, art_button, scrape_button, emulation_button]:
-		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	add_emulation_controls(emulation)
 
-	var setup_button := Button.new()
-	setup_button.text = "Setup wizard  ›"
-	setup_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	setup_button.pressed.connect(func():
+	var backup := preload("res://setup/backup_dialog.gd").new()
+	add_child(backup)
+	backup.setup(self)
+	var backup_button := Button.new()
+	backup_button.text = "Backup and restore  ›"
+	backup_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	backup_button.pressed.connect(func():
 		settings.hide()
-		first_run.open())
-	menu.add_child(setup_button)
-	menu.move_child(emulation_button, menu.get_child_count() - 1)
+		backup.popup_centered(Vector2i(500, 238)))
+	menu.add_child(backup_button)
 
 	var gear := Button.new()
 	gear.name = "SettingsButton"
@@ -707,9 +647,8 @@ func setup_settings() -> void:
 	gear.pressed.connect(func():
 		hovered = -1
 		queue_redraw()
-		emulation_page.hide()
-		menu.show()
-		settings.popup_centered(Vector2i(344, 406)))
+		refresh_port_one_picker()
+		settings.popup_centered(Vector2i(630, 354)))
 	add_child(gear)
 
 func add_emulation_controls(page_controls: VBoxContainer) -> void:
@@ -907,7 +846,7 @@ func refresh_label_art() -> void:
 
 func index_label_images(path: String) -> Dictionary[String, String]:
 	var images: Dictionary[String, String] = {}
-	if path.is_empty():
+	if path.is_empty() or not DirAccess.dir_exists_absolute(path):
 		return images
 	var files := DirAccess.get_files_at(path)
 	files.sort()
@@ -925,7 +864,8 @@ func cartridge_label_texture(index: int) -> Texture2D:
 	if not label_textures.has(title):
 		var image := Image.new()
 		var texture: Texture2D
-		for path in [art_paths.get(title, ""), sidecar_paths.get(title, ""), LocalRuntime.scraped_label(rom_paths[index])]:
+		for path in [art_paths.get(title, ""), sidecar_paths.get(title, ""),
+			LocalRuntime.restored_label(rom_paths[index]), LocalRuntime.scraped_label(rom_paths[index])]:
 			if path.is_empty():
 				continue
 			if path.begins_with("res://"):

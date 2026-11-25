@@ -20,6 +20,8 @@ var next := Button.new()
 var picker := FileDialog.new()
 var folder_paths: Array[Label] = []
 var chosen_console := 0
+var direct_page := false
+var skip := Button.new()
 
 func setup(parent_room: Node2D) -> void:
 	room = parent_room
@@ -50,7 +52,6 @@ func setup(parent_room: Node2D) -> void:
 	var navigation := HBoxContainer.new()
 	navigation.add_theme_constant_override("separation", 8)
 	layout.add_child(navigation)
-	var skip := Button.new()
 	skip.text = "Skip setup"
 	skip.pressed.connect(func(): complete(false))
 	navigation.add_child(skip)
@@ -63,7 +64,7 @@ func setup(parent_room: Node2D) -> void:
 		render_page())
 	navigation.add_child(back)
 	next.pressed.connect(func():
-		if page == TITLES.size() - 1:
+		if direct_page or page == TITLES.size() - 1:
 			complete(true)
 		else:
 			page += 1
@@ -80,18 +81,20 @@ func setup(parent_room: Node2D) -> void:
 		update_folder_paths())
 	add_child(picker)
 
-func open() -> void:
+func open(start_page := 0) -> void:
 	folders = [
 		PackedStringArray([room.library_folder(false), room.library_folder(true)]),
 		PackedStringArray([room.library_folder(false, true), room.library_folder(true, true)]),
 		room.manual_folders.duplicate(),
 	]
-	page = 0
+	direct_page = start_page > 0
+	page = start_page
 	render_page()
 	popup_centered(Vector2i(744, 488))
 
 func complete(apply_folders: bool) -> void:
-	room.finish_setup(folders, apply_folders)
+	if not direct_page or apply_folders:
+		room.finish_setup(folders, apply_folders)
 	hide()
 
 func render_page() -> void:
@@ -101,8 +104,10 @@ func render_page() -> void:
 	folder_paths.clear()
 	heading.text = TITLES[page]
 	description.text = DESCRIPTIONS[page]
+	skip.text = "Cancel" if direct_page else "Skip setup"
+	back.visible = not direct_page
 	back.disabled = page == 0
-	next.text = "Finish" if page == TITLES.size() - 1 else "Next  ›"
+	next.text = "Save" if direct_page else ("Finish" if page == TITLES.size() - 1 else "Next  ›")
 	match page:
 		0:
 			var sample := Label.new()

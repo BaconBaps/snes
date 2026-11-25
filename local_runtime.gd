@@ -24,3 +24,17 @@ static func scraped_label(rom: String) -> String:
 		if FileAccess.file_exists(path):
 			return path
 	return ""
+
+static func restored_media_directory(rom: String) -> String:
+	return ProjectSettings.globalize_path("user://restored-media").path_join(rom.sha256_text())
+
+static func restored_label(rom: String) -> String:
+	for extension in ["png", "jpg", "jpeg", "webp"]:
+		var path := restored_media_directory(rom).path_join("label." + extension)
+		if FileAccess.file_exists(path):
+			return path
+	return ""
+
+static func notes_path(rom: String) -> String:
+	var recovered := restored_media_directory(rom).path_join("notes.txt")
+	return recovered if FileAccess.file_exists(recovered) else rom.get_basename() + ".txt"

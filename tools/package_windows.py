@@ -38,7 +38,7 @@ def build(godot, core_dir, output):
             "pypdfium2==5.13.0", "Pillow==13.0.0",
         ], check=True)
 
-        for script in ("emulator/host.py", "manuals/render_page.py", "screenscraper/fetch_media.py"):
+        for script in ("emulator/host.py", "manuals/render_page.py", "screenscraper/fetch_media.py", "setup/backup_state.py"):
             destination = portable / script
             destination.parent.mkdir(exist_ok=True)
             shutil.copy2(PROJECT / script, destination)
@@ -53,7 +53,7 @@ def build(godot, core_dir, output):
         notice = [
             "Bedroom Gaming Emulator portable build", "",
             "Open Bedroom Gaming Emulator.exe from this extracted folder. Keep the runtime,",
-            "emulator, and manuals folders beside it. Python and PDF support are included.",
+            "emulator, manuals, and setup folders beside it. Python and PDF support are included.",
             "Leave a console's ROM folder blank to play its included homebrew games.",
             "For your own games, choose a ROM folder and place matching PDFs beside the ROMs.",
             "", "Bundled third-party components",

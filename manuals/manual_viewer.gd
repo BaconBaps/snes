@@ -110,15 +110,21 @@ func set_rom(rom: String) -> void:
 		request_page(0)
 
 func find_manual(rom: String) -> String:
+	return manual_path(rom, extra_folder)
+
+static func manual_path(rom: String, folder_override: String) -> String:
 	var stem := rom.get_file().get_basename().to_lower()
 	var folder := rom.get_base_dir()
-	for location in [extra_folder, folder.path_join("manuals"), folder]:
+	for location in [folder_override, folder.path_join("manuals"), folder]:
 		if location.is_empty() or not DirAccess.dir_exists_absolute(location):
 			continue
 		for file in DirAccess.get_files_at(location):
 			if file.get_extension().to_lower() == "pdf" and file.get_basename().to_lower() == stem:
 				return location.path_join(file)
 	var cached := LocalRuntime.media_directory(rom).path_join("manual.pdf")
+	var recovered := LocalRuntime.restored_media_directory(rom).path_join("manual.pdf")
+	if FileAccess.file_exists(recovered):
+		return recovered
 	return cached if FileAccess.file_exists(cached) else ""
 
 func open_manual() -> void:
