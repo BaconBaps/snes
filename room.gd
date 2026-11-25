@@ -638,6 +638,7 @@ func setup_settings() -> void:
 
 	var gear := Button.new()
 	gear.name = "SettingsButton"
+	gear.focus_mode = Control.FOCUS_NONE
 	gear.text = "⚙"
 	gear.tooltip_text = "Settings"
 	gear.position = Vector2(1084, 214)
