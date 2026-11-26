@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://258tyw5fgfay"
-path="res://.godot/imported/room-details.png-cd3f9adc9b068758672430b66fde0890.ctex"
+uid="uid://crpg78lb2m7e7"
+path="res://.godot/imported/bed.svg-1340145e626dafa9188cdf14930dc209.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/room-details.png"
-dest_files=["res://.godot/imported/room-details.png-cd3f9adc9b068758672430b66fde0890.ctex"]
+source_file="res://art/bed.svg"
+dest_files=["res://.godot/imported/bed.svg-1340145e626dafa9188cdf14930dc209.ctex"]
 
 [params]
 
@@ -38,3 +38,6 @@ process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
 detect_3d/compress_to=1
+svg/scale=1.0
+editor/scale_with_editor_scale=false
+editor/convert_colors_with_editor_theme=false

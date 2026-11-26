@@ -17,7 +17,7 @@ const PLAYER_ONE_SOCKET := CONSOLE_TRANSFORM * Rect2(355, 591, 35, 8)
 const PLAYER_TWO_SOCKET := CONSOLE_TRANSFORM * Rect2(440, 591, 35, 8)
 const PLUG_SIZE := Vector2(41, 22)
 const LOOSE_PLUG := Vector2(611, 556)
-const SECOND_CABLE_EXIT_X := 729.0
+const SECOND_CABLE_REST := Vector2(720, 613)
 const DESK := Rect2(770, 252, 354, 308)
 const CEILING_LIGHT := Rect2(970, 60, 126, 62)
 
@@ -1672,7 +1672,7 @@ func draw_bedroom() -> void:
 	var room_bounds := Rect2(0, 0, 1152, 648)
 	draw_texture_rect(preload("res://art/walls-floor.png"), room_bounds, false)
 	draw_texture_rect(preload("res://art/closed-curtains.png"), room_bounds, false)
-	draw_texture_rect(preload("res://art/room-details.png"), room_bounds, false)
+	draw_texture_rect(preload("res://art/bed.svg"), Rect2(0, 327, 136, 226), false)
 	draw_posters()
 	if ceiling_light_on:
 		glow(Vector2(1035, 132), Vector2(255, 219), Color("#ec91a349"))
@@ -2117,17 +2117,29 @@ func draw_controller_plugs() -> void:
 	var cable_exit_y := get_viewport_rect().end.y + 6.0
 	draw_controller_plug(first, Vector2(438 if megadrive else 379, cable_exit_y))
 	if not dragging_plug:
-		draw_controller_plug(second, Vector2(SECOND_CABLE_EXIT_X, cable_exit_y))
+		draw_controller_plug(second, SECOND_CABLE_REST, true)
 
-func draw_controller_plug(at: Vector2, cable_end: Vector2) -> void:
+func draw_controller_plug(at: Vector2, cable_end: Vector2, loose_cable := false) -> void:
 	var start := at + Vector2(PLUG_SIZE.x / 2.0, PLUG_SIZE.y - 1.0)
-	var exit_bend := cable_end - Vector2(0, 16)
-	var bend_height := maxf(0.0, exit_bend.y - start.y)
 	var points := PackedVector2Array()
-	for index in range(33):
-		points.append(start.bezier_interpolate(start + Vector2(0, bend_height * 0.55),
-			exit_bend - Vector2(0, bend_height * 0.3), exit_bend, index / 32.0))
-	points.append(cable_end)
+	if loose_cable:
+		# Let the free end slide a little with the plug and settle into a loose floor curl.
+		var tail := cable_end + Vector2(clampf((start.x - 630.0) * 0.22, -49.0, 19.0), 0)
+		var floor_bend := tail - Vector2(13, -7)
+		for index in range(25):
+			points.append(start.bezier_interpolate(start + Vector2(0, 27),
+				floor_bend - Vector2(43, 4), floor_bend, index / 24.0))
+		for index in range(1, 17):
+			points.append(floor_bend.bezier_interpolate(floor_bend + Vector2(32, 3),
+				tail + Vector2(20, -12), tail, index / 16.0))
+		prop_canvas.draw_polyline(points, Color("#20192587"), 7.0, true)
+	else:
+		var exit_bend := cable_end - Vector2(0, 16)
+		var bend_height := maxf(0.0, exit_bend.y - start.y)
+		for index in range(33):
+			points.append(start.bezier_interpolate(start + Vector2(0, bend_height * 0.55),
+				exit_bend - Vector2(0, bend_height * 0.3), exit_bend, index / 32.0))
+		points.append(cable_end)
 	prop_canvas.draw_polyline(points, Color("#292633"), 5.0, true)
 	prop_canvas.draw_polyline(points, Color("#746e7a"), 2.0, true)
 	rounded(Rect2(at + Vector2(2, 3), PLUG_SIZE), 4, "#29263388")
@@ -2194,8 +2206,7 @@ func _draw() -> void:
 func draw_dragged_prop() -> void:
 	prop_canvas = dragged_prop_layer
 	if dragging_plug:
-		var cable_end := Vector2(SECOND_CABLE_EXIT_X, get_viewport_rect().end.y + 6.0)
-		draw_controller_plug(player_two_plug_position(), cable_end)
+		draw_controller_plug(player_two_plug_position(), SECOND_CABLE_REST, true)
 	if insertion_animation or cartridge_drag_at_slot():
 		draw_slot_cartridge()
 		if megadrive:
