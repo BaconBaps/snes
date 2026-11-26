@@ -195,7 +195,9 @@ var room_dimmer := ColorRect.new()
 var room_overlay := Node2D.new()
 var dragged_prop_layer := Node2D.new()
 var prop_canvas: CanvasItem = self
-var ceiling_light_on := true
+var ceiling_light_on := false
+var ceiling_light_level := 0.0
+var ceiling_light_tween: Tween
 var screen_spill := ColorRect.new()
 var screen_light := Color.BLACK
 var last_insert := -1
@@ -211,7 +213,6 @@ func _ready() -> void:
 	room_dimmer.color = Color("#0a0816ca")
 	room_dimmer.size = Vector2(1152, 648)
 	room_dimmer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	room_dimmer.visible = not ceiling_light_on
 	add_child(room_dimmer)
 	var spill_material := ShaderMaterial.new()
 	spill_material.shader = preload("res://emulator/crt_spill.gdshader")
@@ -302,6 +303,11 @@ func _ready() -> void:
 	add_child(first_run)
 	if not setup_complete:
 		first_run.open.call_deferred()
+	ceiling_light_tween = create_tween()
+	ceiling_light_tween.tween_interval(1.0)
+	ceiling_light_tween.finished.connect(func():
+		ceiling_light_tween = null
+		set_ceiling_light(true))
 
 func _exit_tree() -> void:
 	game_notes.flush()
@@ -329,7 +335,6 @@ func restore_preferences() -> void:
 	md_rom_folder = str(config.get_value("megadrive", "rom_folder", ""))
 	md_art_folder = str(config.get_value("megadrive", "art_folder", ""))
 	stacked = bool(config.get_value("library", "stacked", true))
-	ceiling_light_on = bool(config.get_value("room", "ceiling_light", true))
 	preferred_core = clampi(int(config.get_value("emulation", "core", 0)), 0, emulator.CORE_NAMES.size() - 1)
 	var overrides: Variant = config.get_value("emulation", "port_one_overrides", {})
 	if overrides is Dictionary:
@@ -346,7 +351,6 @@ func save_preferences() -> void:
 	config.set_value("megadrive", "art_folder", library_folder(true, true))
 	config.set_value("room", "megadrive", megadrive)
 	config.set_value("library", "stacked", stacked)
-	config.set_value("room", "ceiling_light", ceiling_light_on)
 	config.set_value("emulation", "core", preferred_core)
 	config.set_value("emulation", "port_one_overrides", port_one_overrides)
 	if config.save(SETTINGS_PATH) != OK:
@@ -781,13 +785,25 @@ func update_crt() -> void:
 	if crt.material.get_shader_parameter("rgb565") != emulator.rgb565:
 		crt.material.set_shader_parameter("rgb565", emulator.rgb565)
 
+func set_ceiling_light(enabled: bool) -> void:
+	ceiling_light_on = enabled
+	if ceiling_light_tween:
+		ceiling_light_tween.kill()
+	ceiling_light_tween = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	ceiling_light_tween.tween_method(update_ceiling_light, ceiling_light_level, 1.0 if enabled else 0.0, 0.45)
+
+func update_ceiling_light(level: float) -> void:
+	ceiling_light_level = level
+	room_dimmer.self_modulate.a = 1.0 - level
+	room_dimmer.visible = level < 1.0
+	update_glass_sheen()
+	queue_redraw()
+
 func update_glass_sheen() -> void:
-	var dim_tint := Color.WHITE.lerp(room_dimmer.color, room_dimmer.color.a)
-	dragged_prop_layer.self_modulate = Color.WHITE if ceiling_light_on else Color(dim_tint, 1.0)
-	crt_static.material.set_shader_parameter("brightness", 1.0 if ceiling_light_on else 0.54)
-	var strength := 0.43 if crt.visible else 1.0
-	if not ceiling_light_on and not crt.visible:
-		strength *= 0.22
+	var dim_tint := Color.WHITE.lerp(room_dimmer.color, room_dimmer.color.a * (1.0 - ceiling_light_level))
+	dragged_prop_layer.self_modulate = Color(dim_tint, 1.0)
+	crt_static.material.set_shader_parameter("brightness", lerpf(0.54, 1.0, ceiling_light_level))
+	var strength := 0.43 if crt.visible else lerpf(0.22, 1.0, ceiling_light_level)
 	crt_glass.material.set_shader_parameter("sheen_strength", strength)
 
 func load_folder(path: String, keep_session := false) -> bool:
@@ -1243,11 +1259,7 @@ func virtual_interact(grab: bool) -> void:
 func press_at(point: Vector2) -> void:
 	var plug := player_two_plug_position()
 	if CEILING_LIGHT.has_point(point) and dragging < 0:
-		ceiling_light_on = not ceiling_light_on
-		room_dimmer.visible = not ceiling_light_on
-		update_glass_sheen()
-		save_preferences()
-		queue_redraw()
+		set_ceiling_light(not ceiling_light_on)
 		return
 	if dragging < 0 and Rect2(plug, PLUG_SIZE).has_point(point):
 		dragging_plug = true
@@ -1674,8 +1686,8 @@ func draw_bedroom() -> void:
 	draw_texture_rect(preload("res://art/closed-curtains.png"), room_bounds, false)
 	draw_texture_rect(preload("res://art/bed.svg"), Rect2(0, 327, 136, 226), false)
 	draw_posters()
-	if ceiling_light_on:
-		glow(Vector2(1035, 132), Vector2(255, 219), Color("#ec91a349"))
+	if ceiling_light_level > 0.0:
+		glow(Vector2(1035, 132), Vector2(255, 219), Color("#ec91a3", 0.286 * ceiling_light_level))
 
 	# Woven rug under the console.
 	shape([Vector2(188, 483), Vector2(630, 483), Vector2(754, 600), Vector2(84, 600)], "#261c2b7f")
@@ -1688,15 +1700,15 @@ func draw_bedroom() -> void:
 
 func draw_ceiling_light() -> void:
 	line(Vector2(1033, 0), Vector2(1033, 71), "#564150", 3)
-	if ceiling_light_on:
-		glow(Vector2(1033, 110), Vector2(113, 71), Color("#ffd2aa75"))
+	if ceiling_light_level > 0.0:
+		glow(Vector2(1033, 110), Vector2(113, 71), Color("#ffd2aa", 0.459 * ceiling_light_level))
 	shape([Vector2(1003, 71), Vector2(1063, 71), Vector2(1091, 108),
-		Vector2(975, 108)], "#a66d67" if ceiling_light_on else "#493847")
+		Vector2(975, 108)], Color("#493847").lerp(Color("#a66d67"), ceiling_light_level).to_html(false))
 	shape([Vector2(1011, 73), Vector2(1055, 73), Vector2(1075, 106),
-		Vector2(988, 106)], "#c48c77" if ceiling_light_on else "#5a4451")
-	rounded(Rect2(975, 105, 116, 10), 5, "#f5bc92" if ceiling_light_on else "#43333e")
+		Vector2(988, 106)], Color("#5a4451").lerp(Color("#c48c77"), ceiling_light_level).to_html(false))
+	rounded(Rect2(975, 105, 116, 10), 5, Color("#43333e").lerp(Color("#f5bc92"), ceiling_light_level).to_html(false))
 	if CEILING_LIGHT.has_point(pointer):
-		line(Vector2(992, 108), Vector2(1075, 108), "#fff0d8" if ceiling_light_on else "#9d7b8b", 2)
+		line(Vector2(992, 108), Vector2(1075, 108), Color("#9d7b8b").lerp(Color("#fff0d8"), ceiling_light_level).to_html(false), 2)
 
 func draw_shoebox() -> void:
 	# The lid rests against the back of the box.
