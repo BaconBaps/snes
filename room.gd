@@ -17,7 +17,13 @@ const PLAYER_ONE_SOCKET := CONSOLE_TRANSFORM * Rect2(355, 591, 35, 8)
 const PLAYER_TWO_SOCKET := CONSOLE_TRANSFORM * Rect2(440, 591, 35, 8)
 const PLUG_SIZE := Vector2(41, 22)
 const LOOSE_PLUG := Vector2(611, 556)
-const SECOND_CABLE_REST := Vector2(720, 613)
+const US_SNES_SHELL := preload("res://art/us-snes-shell.svg")
+const US_RESET := Rect2(443, 499, 60, 16)
+const US_EJECT := Rect2(392, 503, 46, 39)
+const US_PORT_ONE := Rect2(335, 578, 39, 10)
+const US_PORT_TWO := Rect2(457, 578, 39, 10)
+const US_POWER_LED := Vector2(299, 578)
+const US_LABEL := Rect2(28, 10, 104, 47)
 const DESK := Rect2(770, 252, 354, 308)
 const CEILING_LIGHT := Rect2(970, 60, 126, 62)
 
@@ -111,6 +117,7 @@ var notebook := preload("res://cartridge_notebook.gd").new()
 var shoebox_indices: Array[int] = []
 var notebook_selection := -1
 @export var megadrive_preview_scene := false
+var american_snes := false
 var megadrive := false
 var snes_rom_folder := ""
 var snes_art_folder := ""
@@ -335,6 +342,7 @@ func restore_preferences() -> void:
 	md_rom_folder = str(config.get_value("megadrive", "rom_folder", ""))
 	md_art_folder = str(config.get_value("megadrive", "art_folder", ""))
 	stacked = bool(config.get_value("library", "stacked", true))
+	american_snes = bool(config.get_value("room", "american_snes", false))
 	preferred_core = clampi(int(config.get_value("emulation", "core", 0)), 0, emulator.CORE_NAMES.size() - 1)
 	var overrides: Variant = config.get_value("emulation", "port_one_overrides", {})
 	if overrides is Dictionary:
@@ -350,6 +358,7 @@ func save_preferences() -> void:
 	config.set_value("megadrive", "rom_folder", library_folder(true))
 	config.set_value("megadrive", "art_folder", library_folder(true, true))
 	config.set_value("room", "megadrive", megadrive)
+	config.set_value("room", "american_snes", american_snes)
 	config.set_value("library", "stacked", stacked)
 	config.set_value("emulation", "core", preferred_core)
 	config.set_value("emulation", "port_one_overrides", port_one_overrides)
@@ -610,6 +619,19 @@ func setup_settings() -> void:
 	layout_picker.select(1 if stacked else 0)
 	layout_picker.item_selected.connect(change_layout)
 	metadata.add_child(layout_picker)
+	var model_label := Label.new()
+	model_label.text = "SNES model"
+	metadata.add_child(model_label)
+	var model_picker := OptionButton.new()
+	model_picker.add_item("PAL")
+	model_picker.add_item("North America")
+	model_picker.select(int(american_snes))
+	model_picker.item_selected.connect(func(index: int):
+		american_snes = index == 1
+		refresh_label_art()
+		save_preferences()
+		queue_redraw())
+	metadata.add_child(model_picker)
 
 	add_settings_heading(emulation, "Emulation")
 	var core_label := Label.new()
@@ -893,7 +915,7 @@ func cartridge_label_texture(index: int) -> Texture2D:
 			elif image.load(path) != OK:
 				continue
 			if not image.is_empty():
-				if megadrive:
+				if megadrive or american_snes:
 					end_label_palettes[title] = sample_end_label_palette(image)
 				prepare_label_image(image)
 				texture = ImageTexture.create_from_image(image)
@@ -927,7 +949,8 @@ func sample_end_label_palette(image: Image) -> PackedColorArray:
 
 func prepare_label_image(image: Image) -> void:
 	# Cache the stretched, antialiased label at twice its on-screen size.
-	var size := Vector2i((MD_LABEL.size if megadrive else LABEL_SIZE) * 2.0)
+	var label_size := MD_LABEL.size if megadrive else (US_LABEL.size if american_snes else LABEL_SIZE)
+	var size := Vector2i(label_size * 2.0)
 	var radius := LABEL_RADIUS * 2
 	image.resize(size.x, size.y, Image.INTERPOLATE_LANCZOS)
 	image.convert(Image.FORMAT_RGBA8)
@@ -1042,8 +1065,11 @@ func console_position() -> Vector2:
 	var slot := MD_SLOT if megadrive else SLOT
 	return Vector2(slot.get_center().x - cartridge_size().x / 2.0, slot.end.y - console_cartridge_height())
 
+func seated_cartridge_height() -> float:
+	return MD_SEATED_HEIGHT if megadrive else (58.0 if american_snes else SEATED_CART_HEIGHT)
+
 func console_cartridge_height() -> float:
-	var seated_height := MD_SEATED_HEIGHT if megadrive else SEATED_CART_HEIGHT
+	var seated_height := seated_cartridge_height()
 	return minf(cartridge_size().y, seated_height + lift)
 
 func setup_cartridge_navigation() -> void:
@@ -1267,7 +1293,7 @@ func press_at(point: Vector2) -> void:
 		pointer = point
 		hovered = -1
 		queue_redraw()
-	elif (MD_RESET if megadrive else RESET).has_point(point) and seated:
+	elif (MD_RESET if megadrive else (US_RESET if american_snes else RESET)).has_point(point) and seated:
 		if emulator.running:
 			emulator.reset()
 		elif not powered:
@@ -1279,7 +1305,7 @@ func press_at(point: Vector2) -> void:
 		dragging = inserted
 		pull_origin = point
 		cart_grab_offset = point - console_position()
-	elif not megadrive and EJECT.has_point(point) and seated:
+	elif not megadrive and (US_EJECT if american_snes else EJECT).has_point(point) and seated:
 		last_eject = play_cartridge_sound(eject_sound, EJECT_SOUNDS, last_eject)
 		emulator.stop()
 		game_notes.close_for_room()
@@ -1287,7 +1313,7 @@ func press_at(point: Vector2) -> void:
 		powered = false
 		seated = false
 		eject_animation = create_tween()
-		eject_animation.tween_property(self, "lift", minf(CART_SIZE.y - SEATED_CART_HEIGHT + 2.0, console_position().y - SCREEN.end.y - 5.0), 0.17).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		eject_animation.tween_property(self, "lift", minf(CART_SIZE.y - seated_cartridge_height() + 2.0, console_position().y - SCREEN.end.y - 5.0), 0.17).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		message = "Drag the ejected cartridge back to the shoebox."
 	elif inserted >= 0 and not seated and not insertion_animation and Rect2(console_position(), Vector2(CART_SIZE.x, console_cartridge_height())).has_point(point):
 		dragging = inserted
@@ -1307,7 +1333,7 @@ func player_two_plug_position() -> Vector2:
 	return seated_plug_position(player_two_socket()) if emulator.player_two_connected else LOOSE_PLUG
 
 func player_two_socket() -> Rect2:
-	return MD_PORT_TWO if megadrive else PLAYER_TWO_SOCKET
+	return MD_PORT_TWO if megadrive else (US_PORT_TWO if american_snes else PLAYER_TWO_SOCKET)
 
 func plug_over_socket(point: Vector2) -> bool:
 	var plug_center := point - plug_grab_offset + PLUG_SIZE / 2.0
@@ -1328,7 +1354,7 @@ func cartridge_edge_meets_slot(point: Vector2) -> bool:
 	var slot := MD_SLOT if megadrive else SLOT
 	var cart := Rect2(dragged_cartridge_position(point), cartridge_size())
 	var overlap := minf(cart.end.x, slot.end.x) - maxf(cart.position.x, slot.position.x)
-	var seated_height := MD_SEATED_HEIGHT if megadrive else SEATED_CART_HEIGHT
+	var seated_height := seated_cartridge_height()
 	var travel := cart.size.y - seated_height
 	var edge_near_slot := cart.end.y >= slot.position.y - 10.0 and cart.end.y <= slot.end.y + travel + 12.0
 	return edge_near_slot and overlap >= cart.size.x * 0.6
@@ -1339,7 +1365,7 @@ func cartridge_slot_pose(point: Vector2) -> Vector2:
 	var bottom := at.y + cartridge_size().y
 	var alignment := smoothstep(slot.position.y - 6.0, slot.end.y + 4.0, bottom)
 	at.x = lerpf(at.x, slot.get_center().x - cartridge_size().x * 0.5, alignment)
-	var seated_height := MD_SEATED_HEIGHT if megadrive else SEATED_CART_HEIGHT
+	var seated_height := seated_cartridge_height()
 	at.y = minf(at.y, slot.end.y - seated_height)
 	return at
 
@@ -1496,6 +1522,9 @@ func cartridge(index: int, at: Vector2, visible_height := -1.0) -> void:
 	if megadrive:
 		draw_megadrive_cartridge(index, at, visible_height)
 		return
+	if american_snes:
+		draw_us_cartridge(index, at, visible_height)
+		return
 	var width := CART_SIZE.x
 	var black_shell := uses_black_shell(titles[index])
 	set_prop_transform(at)
@@ -1558,6 +1587,65 @@ func cartridge_display_title(title: String) -> String:
 		cleaned = title_tags.sub(title, "", true)
 	return " ".join(cleaned.split(" ", false))
 
+func draw_cartridge_end_label(index: int, at: Vector2, rect: Rect2, shell_scale: Vector2) -> void:
+	var title := titles[index]
+	var palette: PackedColorArray = end_label_palettes.get(title.to_lower(), PackedColorArray())
+	var background := Color(LABEL_COLORS[index % LABEL_COLORS.size()]) if palette.is_empty() else palette[0]
+	var ink := Color("#f9e4c5") if palette.is_empty() else palette[1]
+	rounded(rect, 2, background.to_html())
+	var text_baseline := rect.position + Vector2(4, 5.25)
+	set_prop_transform(at + text_baseline * shell_scale, 0.0, shell_scale * 0.5)
+	prop_canvas.draw_string(ThemeDB.fallback_font, Vector2.ZERO, cartridge_display_title(title),
+		HORIZONTAL_ALIGNMENT_CENTER, int((rect.size.x - 8) * 2), 7, ink)
+	set_prop_transform(at, 0.0, shell_scale)
+
+func draw_us_cartridge(index: int, at: Vector2, height: float) -> void:
+	set_prop_transform(at)
+	var edge := Color("#8d879b")
+	var low := Color("#615b71")
+	var centre := Color("#aaa4b3")
+	var dark := Color("#787184")
+	if uses_black_shell(titles[index]):
+		edge = edge.darkened(0.60)
+		low = low.darkened(0.74)
+		centre = centre.darkened(0.65)
+		dark = dark.darkened(0.73)
+	if is_equal_approx(height, CART_SIZE.y):
+		rounded(Rect2(3, 5, 160, height), 4, "#17132492")
+
+	# Low shoulders sit either side of the raised, wrap-labelled centre.
+	rounded(Rect2(1, 6, 158, height - 6), 3, low.to_html(), edge.to_html())
+	gradient(Rect2(3, 9, 154, height - 10), edge.to_html(), low.to_html())
+	shape([Vector2(1, 9), Vector2(5, 5), Vector2(155, 5), Vector2(159, 9)], centre.to_html())
+	for y in range(22, int(height) - 1, 13):
+		for rib in [Vector2(2, 25), Vector2(135, 158)]:
+			line(Vector2(rib.x, y), Vector2(rib.y, y), low.darkened(0.37).to_html())
+			line(Vector2(rib.x, y + 1), Vector2(rib.y, y + 1), edge.lightened(0.18).to_html())
+
+	rounded(Rect2(24, 0, 112, height), 3, dark.to_html(), low.to_html())
+	gradient(Rect2(25, 8, 110, height - 9), centre.to_html(), dark.to_html())
+	line(Vector2(27, 1), Vector2(133, 1), centre.lightened(0.35).to_html())
+	line(Vector2(25, 8), Vector2(135, 8), edge.lightened(0.39).to_html())
+	var art := cartridge_label_texture(index)
+	draw_cartridge_end_label(index, at, Rect2(28, 2, 104, 8), Vector2.ONE)
+	var face := Rect2(0, 0, 160, height)
+	var label := US_LABEL.intersection(face)
+	rounded(label, LABEL_RADIUS, LABEL_COLORS[index % LABEL_COLORS.size()] if not art else "#1b1823")
+	if art:
+		prop_canvas.draw_texture_rect_region(art, label, Rect2(Vector2.ZERO, art.get_size() * label.size / US_LABEL.size))
+	else:
+		words(cartridge_display_title(titles[index]), 33, 39, 10, 94)
+	if height > 66.0:
+		var grip := Rect2(35, 65, 90, minf(height - 65.0, 7.0))
+		rounded(grip, 3, low.darkened(0.42).to_html(), edge.to_html())
+		line(grip.position + Vector2(6, 2), Vector2(grip.end.x - 6, grip.position.y + 2), low.to_html())
+	if height >= CART_SIZE.y - 2.0:
+		for x in [12.0, 148.0]:
+			var screw := Vector2(x, CART_SIZE.y - 8)
+			prop_canvas.draw_circle(screw, 2.7, low.darkened(0.42), true, -1, true)
+			line(screw - Vector2(1, 0), screw + Vector2(1, 0), centre.to_html())
+	set_prop_transform(Vector2.ZERO)
+
 func draw_megadrive_cartridge(index: int, at: Vector2, height: float) -> void:
 	set_prop_transform(at, 0.0, Vector2(MD_CART_WIDTH_SCALE, 1))
 	if height == MD_CART_SIZE.y:
@@ -1584,18 +1672,8 @@ func draw_megadrive_cartridge(index: int, at: Vector2, height: float) -> void:
 	line(Vector2(154, 16), Vector2(149, height - 9), "#111019")
 	var art := cartridge_label_texture(index)
 	var accent: String = LABEL_COLORS[index % LABEL_COLORS.size()]
-	var end_label := Rect2(25, 3, 110, 8)
 	var title := titles[index]
-	var palette: PackedColorArray = end_label_palettes.get(title.to_lower(), PackedColorArray())
-	var background := Color(accent) if palette.is_empty() else palette[0]
-	var ink := Color("#f9e4c5") if palette.is_empty() else palette[1]
-	rounded(end_label, 2, background.to_html())
-	var shell_scale := Vector2(MD_CART_WIDTH_SCALE, 1)
-	var text_baseline := Vector2(29, 8.25) * shell_scale
-	set_prop_transform(at + text_baseline, 0.0, shell_scale * 0.5)
-	prop_canvas.draw_string(ThemeDB.fallback_font, Vector2.ZERO, cartridge_display_title(title),
-		HORIZONTAL_ALIGNMENT_CENTER, 204, 7, ink)
-	set_prop_transform(at, 0.0, shell_scale)
+	draw_cartridge_end_label(index, at, Rect2(25, 3, 110, 8), Vector2(MD_CART_WIDTH_SCALE, 1))
 	var visible_face := Rect2(0, 0, 160, height)
 	var label := MD_LABEL.intersection(visible_face)
 	rounded(MD_LABEL.grow(0.8).intersection(visible_face), 4, "#14121b", "#5e5260")
@@ -1980,6 +2058,9 @@ func draw_console() -> void:
 	if megadrive:
 		draw_megadrive_console()
 		return
+	if american_snes:
+		draw_us_console()
+		return
 	# The wide front and foreshortened top follow the angled PAL reference.
 	glow(Vector2(414, 587), Vector2(171, 27), Color("#201927b0"))
 	set_prop_matrix(CONSOLE_TRANSFORM)
@@ -2005,7 +2086,68 @@ func draw_console() -> void:
 	draw_console_wordmark()
 	set_prop_transform(Vector2.ZERO)
 
+func draw_us_console() -> void:
+	glow(Vector2(414, 587), Vector2(171, 27), Color("#201927b0"))
+	draw_texture_rect(US_SNES_SHELL, Rect2(269, 423, 294, 186), false)
+	var deck_wordmark := Vector2(335, 446)
+	set_prop_transform(deck_wordmark, 0, Vector2(1.0, 0.70))
+	words("SUPER NINTENDO", 0, 0, 10)
+	words("E N T E R T A I N M E N T   S Y S T E M", 0, 7, 4)
+	set_prop_transform(Vector2.ZERO)
+
+	rounded(SLOT.grow(2), 3, "#a39dad", "#686174")
+	rounded(SLOT, 2, "#322c42")
+	var opening := slot_flap_opening()
+	var flap := SLOT.grow(-2)
+	flap.size.y *= lerpf(1.0, 0.16, opening)
+	rounded(flap, 2, Color("#a6a0af").darkened(opening * 0.68).to_html())
+	if opening < 0.98:
+		line(flap.position + Vector2(3, 1), Vector2(flap.end.x - 3, flap.position.y + 1),
+			Color("#ddd3dc", 1.0 - opening).to_html())
+
+	if not insertion_animation and not cartridge_drag_at_slot():
+		draw_slot_cartridge()
+	draw_snes_slot_lip()
+
+	var power := Rect2(329, 499, 60, 16)
+	if powered:
+		power.position.y -= 2.0
+	draw_us_switch(power, "POWER", powered)
+	draw_us_switch(US_RESET, "RESET", seated and US_RESET.has_point(pointer))
+	var eject_active := seated and US_EJECT.has_point(pointer)
+	shape([US_EJECT.position + Vector2(3, 0), Vector2(US_EJECT.end.x - 3, US_EJECT.position.y),
+		US_EJECT.end, Vector2(US_EJECT.position.x, US_EJECT.end.y)], "#797485")
+	gradient(US_EJECT.grow(-4), "#a7a1b3" if eject_active else "#928c9e", "#6f697e")
+	line(Vector2(US_EJECT.position.x + 3, US_EJECT.end.y),
+		US_EJECT.end - Vector2(3, 0), "#494453")
+	prop_canvas.draw_string(ThemeDB.fallback_font, US_EJECT.position + Vector2(0, 34),
+		"EJECT", HORIZONTAL_ALIGNMENT_CENTER, int(US_EJECT.size.x), 7, Color("#e9dde5"))
+
+	for port in [US_PORT_ONE, US_PORT_TWO]:
+		rounded(port.grow(1.5), 4, "#a49baa", "#5a5267")
+		rounded(port, 3, "#252233", "#666071")
+		rounded(Rect2(port.position + Vector2(3, 2), Vector2(16, 6)), 2, "#777285")
+		rounded(Rect2(port.position + Vector2(20, 2), Vector2(16, 6)), 2, "#777285")
+		for pin in [6, 10, 14, 23, 27, 31]:
+			draw_circle(port.position + Vector2(pin, 5), 1.3, Color("#343041"), true, -1, true)
+	draw_circle(US_POWER_LED, 2.8, Color("#615463"), true, -1, true)
+	draw_circle(US_POWER_LED, 1.6, Color("#322533"), true, -1, true)
+
+func draw_us_switch(rect: Rect2, caption: String, active: bool) -> void:
+	rounded(rect.grow(1.5), 4, "#4d415f", "#9e8ca8")
+	rounded(rect, 3, "#514079", "#7a60a2")
+	gradient(rect.grow(-2), "#ac8bcb" if active else "#8a6db0", "#443268")
+	rounded(Rect2(rect.position + Vector2(6, 3), Vector2(rect.size.x - 12, 6)), 3, "#5d497f")
+	line(rect.position + Vector2(9, 4), Vector2(rect.end.x - 9, rect.position.y + 4), "#a28bb8")
+	prop_canvas.draw_string(ThemeDB.fallback_font, rect.position + Vector2(0, 12),
+		caption, HORIZONTAL_ALIGNMENT_CENTER, int(rect.size.x), 6, Color("#f4e4fc"))
+
 func draw_snes_slot_lip() -> void:
+	if american_snes:
+		var lip := Rect2(SLOT.position.x - 2, SLOT.end.y - 1, SLOT.size.x + 4, 4)
+		rounded(lip, 1, "#a9a3b1")
+		line(lip.position, Vector2(lip.end.x, lip.position.y), "#777085")
+		return
 	set_prop_matrix(CONSOLE_TRANSFORM)
 	prop_canvas.draw_texture_rect(preload("res://art/pal-console-slot-lip.png"),
 		Rect2(SLOT_ART.position.x - 7.0, SLOT_ART.end.y - 3.0, SLOT_ART.size.x + 14.0, 7.0), false)
@@ -2122,28 +2264,28 @@ func draw_console_wordmark() -> void:
 	set_prop_matrix(CONSOLE_TRANSFORM)
 
 func draw_controller_plugs() -> void:
-	var first := seated_plug_position(MD_PORT_ONE if megadrive else PLAYER_ONE_SOCKET)
+	var first := seated_plug_position(MD_PORT_ONE if megadrive else (US_PORT_ONE if american_snes else PLAYER_ONE_SOCKET))
 	var second := player_two_plug_position()
 	if dragging_plug and plug_over_socket(pointer):
 		rounded(player_two_socket().grow(4), 5, "#a47b62", "#ffd7aa")
 	var cable_exit_y := get_viewport_rect().end.y + 6.0
 	draw_controller_plug(first, Vector2(438 if megadrive else 379, cable_exit_y))
 	if not dragging_plug:
-		draw_controller_plug(second, SECOND_CABLE_REST, true)
+		draw_controller_plug(second, Vector2(749, cable_exit_y), true)
 
-func draw_controller_plug(at: Vector2, cable_end: Vector2, loose_cable := false) -> void:
+func draw_controller_plug(at: Vector2, cable_end: Vector2, floor_cable := false) -> void:
 	var start := at + Vector2(PLUG_SIZE.x / 2.0, PLUG_SIZE.y - 1.0)
 	var points := PackedVector2Array()
-	if loose_cable:
-		# Let the free end slide a little with the plug and settle into a loose floor curl.
+	if floor_cable:
+		# The cable settles toward the floor, then continues past the frame.
 		var tail := cable_end + Vector2(clampf((start.x - 630.0) * 0.22, -49.0, 19.0), 0)
-		var floor_bend := tail - Vector2(13, -7)
+		var floor_bend := tail - Vector2(63, 32)
 		for index in range(25):
-			points.append(start.bezier_interpolate(start + Vector2(0, 27),
-				floor_bend - Vector2(43, 4), floor_bend, index / 24.0))
+			points.append(start.bezier_interpolate(start + Vector2(0, 22),
+				floor_bend - Vector2(43, 10), floor_bend, index / 24.0))
 		for index in range(1, 17):
-			points.append(floor_bend.bezier_interpolate(floor_bend + Vector2(32, 3),
-				tail + Vector2(20, -12), tail, index / 16.0))
+			points.append(floor_bend.bezier_interpolate(floor_bend + Vector2(28, 6.5),
+				tail - Vector2(20, 15), tail, index / 16.0))
 		prop_canvas.draw_polyline(points, Color("#20192587"), 7.0, true)
 	else:
 		var exit_bend := cable_end - Vector2(0, 16)
@@ -2218,7 +2360,7 @@ func _draw() -> void:
 func draw_dragged_prop() -> void:
 	prop_canvas = dragged_prop_layer
 	if dragging_plug:
-		draw_controller_plug(player_two_plug_position(), SECOND_CABLE_REST, true)
+		draw_controller_plug(player_two_plug_position(), Vector2(749, get_viewport_rect().end.y + 6), true)
 	if insertion_animation or cartridge_drag_at_slot():
 		draw_slot_cartridge()
 		if megadrive:
@@ -2240,6 +2382,10 @@ func draw_room_overlay() -> void:
 		var led := MD_POWER_LED + console_slide
 		glow(led, Vector2(13, 9), Color("#fb435475"), room_overlay)
 		room_overlay.draw_circle(led, 2.3, Color("#fc4258"), true, -1, true)
+	elif american_snes:
+		var led := US_POWER_LED + console_slide
+		glow(led, Vector2(12, 8), Color("#ff324975"), room_overlay)
+		room_overlay.draw_circle(led, 1.9, Color("#fc4258"), true, -1, true)
 	else:
 		room_overlay.draw_set_transform_matrix(CONSOLE_TRANSFORM.translated(console_slide))
 		glow(Vector2(499, 579), Vector2(20, 8), Color("#ff4d5568"), room_overlay)

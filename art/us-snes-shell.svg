@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="294" height="186" viewBox="269 423 294 186">
+  <defs>
+    <linearGradient id="top" x2=".25" y2="1"><stop stop-color="#babac4"/><stop offset=".44" stop-color="#a09eaa"/><stop offset="1" stop-color="#777382"/></linearGradient>
+    <linearGradient id="deck" x2=".1" y2="1"><stop stop-color="#d0ccd3"/><stop offset=".68" stop-color="#a9a6b3"/><stop offset="1" stop-color="#8b859b"/></linearGradient>
+    <linearGradient id="bevel" x2="0" y2="1"><stop stop-color="#dad5dc"/><stop offset=".23" stop-color="#a39eae"/><stop offset="1" stop-color="#6e687d"/></linearGradient>
+    <linearGradient id="front" x2=".06" y2="1"><stop stop-color="#938f9e"/><stop offset=".54" stop-color="#777383"/><stop offset="1" stop-color="#545060"/></linearGradient>
+    <linearGradient id="rib" x2=".24" y2="1"><stop stop-color="#b9b4bf"/><stop offset=".78" stop-color="#a7a2af"/><stop offset="1" stop-color="#928d9e"/></linearGradient>
+    <linearGradient id="base" x2="0" y2="1"><stop stop-color="#6e697a"/><stop offset="1" stop-color="#4a4556"/></linearGradient>
+  </defs>
+  <!-- Bottom casing, side bevels and the moulded front seam. -->
+  <path d="M272 549 305 498 523 498 560 549 554 589 545 601Q542 605 535 605H296Q286 604 283 598L274 582Z" fill="url(#base)" stroke="#423e4e" stroke-width="1.6"/>
+  <path d="M273 552 560 552 558 580 550 595 543 599H291L281 590 275 574Z" fill="url(#front)"/>
+  <path d="m276 579 38 2 4 4h194l4-4 41-2" fill="none" stroke="#454150" stroke-width="1.4"/>
+  <path d="M289 595 304 597H530l14-2" fill="none" stroke="#a4a0ae" stroke-opacity=".35"/>
+  <path d="M282 582 288 594 280 585Z" fill="#302b3d"/>
+  <!-- Sloping lower deck and raised cartridge platform. -->
+  <path d="M306 485 525 485 559 548Q561 554 555 556H277Q271 555 273 548Z" fill="url(#top)" stroke="#c0b9c7" stroke-width="1.25"/>
+  <path d="M331 428Q334 425 342 425H487Q495 425 500 430L518 468Q525 481 525 493L522 499H307L305 493 307 478Z" fill="url(#deck)" stroke="#d1cbd6" stroke-width="1.3"/>
+  <path d="M307 481H523l2 12-3 6H308l-3-6Z" fill="url(#bevel)"/>
+  <path d="M309 483H522M307 496H524" stroke="#d9d1df" stroke-opacity=".46" fill="none"/>
+  <path d="m329 479 16-49m154 2 14 47" fill="none" stroke="#807a8c" stroke-opacity=".75"/>
+  <path d="m330 479 16-49m154 2 14 47" fill="none" stroke="#eee5ec" stroke-opacity=".42"/>
+  <path d="M347 431H484" stroke="#e4dbe2" stroke-opacity=".57" stroke-linecap="round"/>
+  <path d="M462 432h24m-23 2h24m-23 2h24m-23 2h24m-23 2h24" stroke="#777082" stroke-opacity=".54" stroke-linecap="round"/>
+  <!-- Parallel ridges run either side of the eject lever and wrap onto the face. -->
+  <path d="M338 499H392L394 555 394 593Q394 600 389 602H324Q318 601 317 594L313 556Z" fill="url(#front)" stroke="#534c62" stroke-width="1.3"/>
+  <path d="M439 499H494L519 556 515 594Q514 601 508 602H445Q438 600 438 593L438 555Z" fill="url(#front)" stroke="#534c62" stroke-width="1.3"/>
+  <path d="M338 499H392L394 554Q393 558 388 558H318Q313 557 313 554Z" fill="url(#rib)" stroke="#d5ccd6" stroke-opacity=".72"/>
+  <path d="M439 499H494L519 554Q519 558 514 558H443Q438 557 438 554Z" fill="url(#rib)" stroke="#d5ccd6" stroke-opacity=".72"/>
+  <path d="M317 563H389m53 0h73M322 596h68m52 0h68" fill="none" stroke="#afa9ba" stroke-opacity=".45"/>
+  <path d="M399 575H434m-35 16h35" stroke="#3d394c" opacity=".59" fill="none"/>
+  <!-- A row of small moulded recesses under the centre of the base. -->
+  <path d="m402 602 3 3m5-3 3 3m5-3 3 3m5-3 3 3" stroke="#332f41" stroke-width="2" stroke-linecap="round"/>
+</svg>
